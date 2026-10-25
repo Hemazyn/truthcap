@@ -14,7 +14,7 @@ TruthCap turns everyday agreements — a used item's condition, a repair quote, 
 - **Template-based agreements** - Five pre-built templates for the most common real-life scenarios
 - **Plain-language records** - Write agreements in words both people understand, no legal jargon
 - **Mutual acknowledgment** - Both parties must read and acknowledge with timestamped proof
-- **Share by link or code** - The share link carries the record itself, so it opens on any device, no account required
+- **Short share links** - An 8-character link (`/s/ab23cd45`) that opens the record on any device, no account required, plus a QR code on the record screens for scanning in person
 - **Records page** - Every record saved in this browser, searchable and filterable by status
 - **Local-first & private** - Records live in your browser's localStorage until Phase 3 backend arrives
 - **Portable** - Copy as text, copy the link, or print/save as PDF
@@ -45,28 +45,30 @@ Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
 
 ## 🛠️ Tech Stack
 
-| Layer                | Technology                                                            | Purpose                                         |
-| -------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
-| **Framework**        | [React 19](https://react.dev/)                                        | UI library with latest features                 |
-| **Language**         | [TypeScript 5](https://www.typescriptlang.org/)                       | Type-safe development                           |
-| **Build Tool**       | [Vite 8](https://vitejs.dev/)                                         | Fast dev server and optimized builds            |
-| **Styling**          | [Tailwind CSS 4](https://tailwindcss.com/)                            | Utility-first CSS with design tokens            |
-| **State Management** | [Zustand 5](https://zustand-demo.pmnd.rs/)                            | Lightweight state with localStorage persistence |
-| **Animations**       | [Framer Motion](https://www.framer.com/motion/)                       | Smooth, accessible animations                   |
-| **Icons**            | [Lucide React](https://lucide.dev/)                                   | Beautiful, consistent icons                     |
-| **Testing**          | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | Unit and E2E testing                            |
+| Layer                | Technology                                                            | Purpose                                             |
+| -------------------- | --------------------------------------------------------------------- | --------------------------------------------------- |
+| **Framework**        | [React 19](https://react.dev/)                                        | UI library with latest features                     |
+| **Language**         | [TypeScript 5](https://www.typescriptlang.org/)                       | Type-safe development                               |
+| **Build Tool**       | [Vite 8](https://vitejs.dev/)                                         | Fast dev server and optimized builds                |
+| **Styling**          | [Tailwind CSS 4](https://tailwindcss.com/)                            | Utility-first CSS with design tokens                |
+| **State Management** | [Zustand 5](https://zustand-demo.pmnd.rs/)                            | Lightweight state with localStorage persistence     |
+| **Animations**       | [Framer Motion](https://www.framer.com/motion/)                       | Smooth, accessible animations                       |
+| **Icons**            | [Lucide React](https://lucide.dev/)                                   | Beautiful, consistent icons                         |
+| **Short links**      | [Upstash Redis](https://upstash.com/)                                 | Stored records behind 8-character links, 90-day TTL |
+| **Testing**          | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | Unit and E2E testing                                |
 
 ## 📁 Project Structure
 
 ```
 truthcap/
+├── api/                 # Serverless functions (short share links)
 ├── public/              # Static assets (favicon, icons)
 ├── src/
 │   ├── components/      # React components
 │   │   ├── ui/         # Reusable UI primitives
 │   │   └── ...         # Feature components
 │   ├── data/           # Template definitions
-│   ├── lib/            # Utilities (router, storage, validation)
+│   ├── lib/            # Utilities (router, storage, validation, share payload)
 │   ├── store/          # Zustand store
 │   ├── types/          # TypeScript type definitions
 │   ├── App.tsx         # App shell and routing
@@ -86,13 +88,14 @@ truthcap/
 | `/records`           | Every record saved on this device, with search and status filters |
 | `/acknowledge/:code` | Acknowledgment page for the other party                           |
 | `/record/:id`        | View pending or completed record                                  |
-| `/shared#<payload>`  | Read-only copy opened from a share link, decoded in the browser   |
+| `/s/:id`             | Short link: fetches the stored record, then shows the shared copy |
+| `/shared#<payload>`  | Read-only copy decoded from the link itself (offline fallback)    |
 
 ## 🔄 How It Works
 
 1. **Pick a template** - Choose from five scenarios that match your agreement
 2. **Fill in details** - Add the specifics: what, condition, price, dates, parties
-3. **Share** - Generate a share link and 6-character code for the other person
+3. **Share** - Send the short link or QR code, plus the 6-character code
 4. **Acknowledge** - The other party reviews and confirms the agreement
 5. **Keep copies** - Both parties have access to the timestamped final record
 
@@ -114,9 +117,30 @@ truthcap/
 
 ## 💾 Data Storage
 
-All records are stored locally in your browser under `localStorage` key `truthcap.records.v1`. Data never leaves your device in the current version.
+Records live in your browser under `localStorage` key `truthcap.records.v1`.
 
-Share links (`/shared#…`) carry a compressed (deflate-raw), base64url-encoded copy of the record in the URL fragment — about half the length of the plain JSON and never sent to a host — so the other person can open it on their device without a server. Older uncompressed links still open. Acknowledging a shared copy timestamps that copy on their device; syncing both copies requires the upcoming Phase 3 backend.
+**Short links.** When you share, the encoded record is sent to `POST /api/share`, stored under an 8-character id and returned as `/s/ab23cd45`. The record is kept there for **90 days** (`EX 7776000`), after which the link shows "We can't find that record". Anyone holding the link can read the record, exactly like a forwarded PDF — treat the link as the record itself.
+
+**Offline fallback.** If the API is unreachable (no connection, or a deploy without the store configured), sharing falls back to the record travelling inside the URL fragment (`/shared#…`): nothing is stored on a server, the link is longer, and the app says so in the UI. Local development gets a working API from the dev server, so you only see the fallback when you are actually offline.
+
+The payload itself (`src/lib/payload.ts`) is binary — template and choices as indexes, timestamps as varints, dates as three bytes, party roles left out because the template already has them — deflated and base64url-encoded. A typical record is ~220 characters before it is stored behind a short id.
+
+Acknowledging a shared copy timestamps that copy on the receiving device; syncing both copies requires the upcoming Phase 3 backend.
+
+### Enabling short links
+
+Local development needs nothing: `npm run dev` serves `/api/share` from memory (cleared when the server restarts).
+
+For a deployment, create a Redis database on [Upstash](https://console.upstash.com) and set two environment variables in Vercel (and in `.env.local` if you want `vercel dev` to use them):
+
+```bash
+UPSTASH_REDIS_REST_URL=...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+`api/share.ts` talks to Upstash over its HTTP REST API, so there is no client library or connection pool. Without these variables the endpoint answers `503` and sharing falls back to the long self-contained links.
+
+Known gap: `POST /api/share` validates size and rejects cross-origin writes, but is not rate limited. Anyone can create links until the Redis quota runs out; add Upstash's rate limiter before opening it to the public.
 
 ## 🤝 Contributing
 

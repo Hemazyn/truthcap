@@ -1,6 +1,7 @@
 import { getTemplate } from "@/data/templates";
 import { routes } from "@/lib/router";
 import { encodeRecord } from "@/lib/share";
+import { createShortLink } from "@/lib/shortlink";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
 export function findRecord(records: TruthCapture[], id: string): TruthCapture | null {
@@ -22,13 +23,20 @@ export function templateFor(capture: TruthCapture | null): TruthTemplate | null 
   return getTemplate(capture.templateId) ?? null;
 }
 
+export type ShareLink = { url: string; viaServer: boolean };
+
 /**
- * A link anyone can open: the record travels inside the URL fragment, so it
- * works on another device without an account or a server.
+ * A link anyone can open. Short links keep the record on the server; when that
+ * is unreachable the record travels inside the URL fragment instead, so sharing
+ * still works offline.
  */
-export async function shareUrlFor(capture: TruthCapture): Promise<string> {
+export async function shareLinkFor(capture: TruthCapture): Promise<ShareLink> {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  return `${origin}${routes.shared(await encodeRecord(capture))}`;
+  const payload = await encodeRecord(capture);
+  const short = await createShortLink(payload);
+
+  if (short) return { url: short, viaServer: true };
+  return { url: `${origin}${routes.shared(payload)}`, viaServer: false };
 }
 
 export function recordUrlFor(id: string): string {

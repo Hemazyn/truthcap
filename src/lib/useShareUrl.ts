@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
-import { shareUrlFor } from "@/lib/records";
+import { shareLinkFor, type ShareLink } from "@/lib/records";
 import type { TruthCapture } from "@/types/truth";
 
-/** Builds the share link asynchronously because the payload is compressed. */
-export function useShareUrl(capture: TruthCapture): string | null {
-  const [url, setUrl] = useState<string | null>(null);
+/**
+ * Builds the share link asynchronously — the payload is compressed and usually
+ * stored behind a short id — and reports whether it lives on the server, so the
+ * copy around it can be honest about where the record is.
+ */
+export function useShareUrl(capture: TruthCapture): { url: string | null; viaServer: boolean } {
+  const [resolved, setResolved] = useState<{ capture: TruthCapture; link: ShareLink } | null>(null);
 
   useEffect(() => {
     let active = true;
 
-    shareUrlFor(capture)
-      .then((value) => {
-        if (active) setUrl(value);
+    shareLinkFor(capture)
+      .then((link) => {
+        if (active) setResolved({ capture, link });
       })
       .catch(() => {
-        if (active) setUrl(null);
+        if (active) setResolved({ capture, link: { url: "", viaServer: false } });
       });
 
     return () => {
@@ -22,5 +26,7 @@ export function useShareUrl(capture: TruthCapture): string | null {
     };
   }, [capture]);
 
-  return url;
+  const link = resolved?.capture === capture ? resolved.link : null;
+
+  return { url: link?.url || null, viaServer: link?.viaServer ?? false };
 }

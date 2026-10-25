@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { decodeRecord, encodeRecord } from "./share";
 import type { TruthCapture } from "@/types/truth";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const capture: TruthCapture = {
   id: "trc_abc12345",
@@ -72,15 +76,46 @@ describe("share link encoding", () => {
     const encoded = await encodeRecord(capture);
     const legacy = legacyLink(capture);
 
-    expect(encoded.startsWith("z")).toBe(true);
-    expect(encoded.length).toBeLessThan(legacy.length * 0.6);
+    expect(encoded.length).toBeLessThan(legacy.length * 0.35);
+    // Short enough that the whole link stays comfortably a QR code.
+    expect(encoded.length).toBeLessThan(240);
+  });
+
+  it("keeps edited party roles", async () => {
+    const customRoles: TruthCapture = {
+      ...capture,
+      parties: [
+        { role: "Seller", name: "Chinaza", contact: "" },
+        { role: "Buyer", name: "Tunde", contact: "" },
+      ],
+    };
+
+    expect(await decodeRecord(await encodeRecord(customRoles))).toEqual(customRoles);
+  });
+
+  it("falls back to an uncompressed payload without CompressionStream", async () => {
+    vi.stubGlobal("CompressionStream", undefined);
+    const encoded = await encodeRecord(capture);
+    vi.unstubAllGlobals();
+
+    expect(encoded.startsWith("b")).toBe(true);
+    expect(await decodeRecord(encoded)).toEqual(capture);
+  });
+
+  it("decodes a payload that was deflated but not compressed as JSON", async () => {
+    const stream = new Blob([JSON.stringify({ v: 1, record: capture })]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    const deflated = new Uint8Array(await new Response(stream).arrayBuffer());
+    const binary = Array.from(deflated, (byte) => String.fromCharCode(byte)).join("");
+    const encoded = `z${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+
+    expect(await decodeRecord(encoded)).toEqual(capture);
   });
 
   it("still opens links made before compression", async () => {
     expect(await decodeRecord(legacyLink(capture))).toEqual(capture);
   });
 
-  it("rejects truncated or invalid payloads", async () => {
+  it("rejects truncated, tampered or invalid payloads", async () => {
     const encoded = await encodeRecord(capture);
 
     expect(await decodeRecord("")).toBeNull();
@@ -89,5 +124,6 @@ describe("share link encoding", () => {
     expect(await decodeRecord(encoded.slice(0, 30))).toBeNull();
     expect(await decodeRecord(encoded.slice(0, -6))).toBeNull();
     expect(await decodeRecord(`z${"a".repeat(40)}`)).toBeNull();
+    expect(await decodeRecord(`b${"A".repeat(60)}`)).toBeNull();
   });
 });

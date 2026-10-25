@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Check, CheckCircle2, Copy, Link2, Printer } from "lucide-react";
 import { formatDate, formatFieldValue } from "@/lib/validate";
-import { shareUrlFor } from "@/lib/records";
+import { useShareUrl } from "@/lib/useShareUrl";
 import { printRecord } from "@/lib/print";
 import { Button } from "@/components/ui/Button";
 import { RecordSummary } from "@/components/RecordSummary";
 import { PartyList } from "@/components/PartyList";
+import { ShareQr } from "@/components/ShareQr";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
 interface TruthRecordCardProps {
@@ -16,6 +17,7 @@ interface TruthRecordCardProps {
 export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
   const [copied, setCopied] = useState<"summary" | "link" | null>(null);
 
+  const { url: shareUrl } = useShareUrl(capture);
   const acknowledgedAt = capture.acknowledgment?.when ?? null;
   const currency = typeof capture.values.currency === "string" ? capture.values.currency : "NGN";
 
@@ -39,8 +41,10 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
   };
 
   const copyLink = () => {
-    shareUrlFor(capture)
-      .then((url) => navigator.clipboard.writeText(url))
+    if (!shareUrl) return;
+
+    navigator.clipboard
+      .writeText(shareUrl)
       .then(() => {
         setCopied("link");
         window.setTimeout(() => setCopied(null), 2000);
@@ -85,6 +89,10 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
           </div>
 
           {acknowledgedAt && <p className="mt-4 rounded-xl bg-brand-50 px-3 py-2.5 text-xs leading-relaxed text-brand-800 ring-1 ring-brand-100">Timestamped {formatDate(acknowledgedAt)} — both sides hold the same copy.</p>}
+
+          <div className="mt-4 rounded-xl border border-line bg-surface-2/50 p-3">
+            <ShareQr value={shareUrl} size={120} caption="Scan to open this record on a phone" />
+          </div>
         </div>
       </div>
 
@@ -93,7 +101,7 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
           {copied === "summary" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied === "summary" ? "Copied summary" : "Copy summary"}
         </Button>
-        <Button variant="secondary" size="sm" onClick={copyLink}>
+        <Button variant="secondary" size="sm" onClick={copyLink} disabled={!shareUrl}>
           {copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
           {copied === "link" ? "Link copied" : "Copy share link"}
         </Button>

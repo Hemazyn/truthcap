@@ -9,6 +9,7 @@ import { TruthAcknowledgePage } from "@/components/TruthAcknowledgePage";
 import { TruthRecordPage } from "@/components/TruthRecordPage";
 import { RecordsPage } from "@/components/RecordsPage";
 import { SharedRecordPage } from "@/components/SharedRecordPage";
+import { ShortRecordPage } from "@/components/ShortRecordPage";
 import { Button } from "@/components/ui/Button";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -45,7 +46,7 @@ export default function App() {
   }, [route]);
 
   useEffect(() => {
-    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
+    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" || route.name === "short" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
 
     document.title = title;
   }, [route, records]);
@@ -75,7 +76,7 @@ export default function App() {
   };
 
   const onHome = route.name === "home";
-  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name;
+  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name === "short" ? `${route.name}-${route.id}` : route.name;
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -145,6 +146,8 @@ export default function App() {
 
           {route.name === "shared" && <SharedRecordPage data={route.data} />}
 
+          {route.name === "short" && <ShortRecordPage id={route.id} />}
+
           {route.name === "not-found" && <NotFoundPage />}
         </motion.main>
       </AnimatePresence>
@@ -208,7 +211,7 @@ export default function App() {
           </div>
 
           <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-line pt-6 sm:flex-row sm:items-center">
-            <p className="text-xs text-ink-3">© {new Date().getFullYear()} TruthCap. Built for real-life agreements.</p>
+            <p className="text-xs text-ink-3">Developed by <a href="https://iamtofunmi.vercel.app/" target="_blank" rel="noopener" className="underline underline-offset-2 text-brand-600">devEmma</a></p>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <p className="text-xs text-ink-3">Every record is timestamped and held by both people.</p>
               <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-brand-700">
