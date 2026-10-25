@@ -44,9 +44,11 @@ describe("validateCapture", () => {
     expect(validateCapture({ fields: [amountField] }, { price: 420000 })).toHaveLength(0);
   });
 
-  it("rejects select values outside the declared options", () => {
-    expect(validateCapture({ fields: [selectField] }, { condition: "broken" })[0].message).toBe("Condition must be a valid choice.");
+  it("accepts both listed and custom select values", () => {
     expect(validateCapture({ fields: [selectField] }, { condition: "good" })).toHaveLength(0);
+    // Selects allow a typed custom value, so an unlisted choice is not an error.
+    expect(validateCapture({ fields: [selectField] }, { condition: "screen replaced" })).toHaveLength(0);
+    expect(validateCapture({ fields: [selectField] }, { condition: "" })[0].message).toBe("Condition is required.");
   });
 
   it("rejects dates that cannot be parsed", () => {

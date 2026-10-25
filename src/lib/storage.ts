@@ -15,7 +15,7 @@ export const EMPTY_STATE: PersistedState = {
   activeId: null,
 };
 
-function isCapture(value: unknown): value is TruthCapture {
+export function isCaptureRecord(value: unknown): value is TruthCapture {
   if (!value || typeof value !== "object") return false;
   const record = value as Partial<TruthCapture>;
   return typeof record.id === "string" && typeof record.templateId === "string" && typeof record.title === "string" && typeof record.status === "string" && typeof record.createdAt === "string" && Array.isArray(record.parties) && typeof record.values === "object" && record.values !== null;
@@ -33,7 +33,7 @@ export function loadState(): PersistedState {
       return EMPTY_STATE;
     }
 
-    const records = parsed.records.filter(isCapture);
+    const records = parsed.records.filter(isCaptureRecord);
     const activeId = typeof parsed.activeId === "string" && records.some((record) => record.id === parsed.activeId) ? parsed.activeId : null;
 
     return { version: STORAGE_VERSION, records, activeId };

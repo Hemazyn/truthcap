@@ -16,6 +16,9 @@ type Actions = {
   initiate: () => void;
   reopenDraft: () => void;
   acknowledge: (recordId: string, code: string) => boolean;
+  /** Bring a record that arrived through a share link into this browser. */
+  importRecord: (capture: TruthCapture) => void;
+  openRecord: (recordId: string) => void;
   discardDraft: () => void;
   clearActive: () => void;
   hydrate: () => void;
@@ -171,6 +174,23 @@ export const useTruthStore = create<State & Actions>((set, get) => {
         activeId,
       );
       return true;
+    },
+
+    importRecord: (capture) => {
+      const { records, activeId } = get();
+      const existing = records.find((record) => record.id === capture.id);
+
+      // Never downgrade a copy that was already acknowledged here.
+      if (existing?.status === "acknowledged") return;
+
+      const next = existing ? records.map((record) => (record.id === capture.id ? capture : record)) : [...records, capture];
+      commit(next, activeId);
+    },
+
+    openRecord: (recordId) => {
+      const { records } = get();
+      if (!records.some((record) => record.id === recordId)) return;
+      commit(records, recordId);
     },
 
     clearActive: () => {
