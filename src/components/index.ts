@@ -6,6 +6,7 @@ export * from "./RecordNotFound";
 export * from "./RecordSummary";
 export * from "./RecordsPage";
 export * from "./ScrollProgress";
+export * from "./ShareQr";
 export * from "./SharedRecordPage";
 export * from "./TruthAcknowledgePage";
 export * from "./TruthCaptureForm";

@@ -14,7 +14,7 @@ TruthCap turns everyday agreements — a used item's condition, a repair quote, 
 - **Template-based agreements** - Five pre-built templates for the most common real-life scenarios
 - **Plain-language records** - Write agreements in words both people understand, no legal jargon
 - **Mutual acknowledgment** - Both parties must read and acknowledge with timestamped proof
-- **Share by link or code** - The share link carries the record itself, so it opens on any device, no account required
+- **Share by link, QR code or code** - The share link carries the record itself, so it opens on any device, no account required; record screens show a QR code to scan
 - **Records page** - Every record saved in this browser, searchable and filterable by status
 - **Local-first & private** - Records live in your browser's localStorage until Phase 3 backend arrives
 - **Portable** - Copy as text, copy the link, or print/save as PDF
@@ -66,7 +66,7 @@ truthcap/
 │   │   ├── ui/         # Reusable UI primitives
 │   │   └── ...         # Feature components
 │   ├── data/           # Template definitions
-│   ├── lib/            # Utilities (router, storage, validation)
+│   ├── lib/            # Utilities (router, storage, validation, share payload)
 │   ├── store/          # Zustand store
 │   ├── types/          # TypeScript type definitions
 │   ├── App.tsx         # App shell and routing
@@ -116,7 +116,9 @@ truthcap/
 
 All records are stored locally in your browser under `localStorage` key `truthcap.records.v1`. Data never leaves your device in the current version.
 
-Share links (`/shared#…`) carry a compressed (deflate-raw), base64url-encoded copy of the record in the URL fragment — about half the length of the plain JSON and never sent to a host — so the other person can open it on their device without a server. Older uncompressed links still open. Acknowledging a shared copy timestamps that copy on their device; syncing both copies requires the upcoming Phase 3 backend.
+Share links (`/shared#…`) carry the record itself in the URL fragment, so the other person can open it on their device without a server and no host ever receives it. The record is packed into a binary payload (`src/lib/payload.ts`) — template and choices as indexes, timestamps as varints, dates as three bytes, party roles left out because the template already has them — then deflated and base64url-encoded. A typical record comes out around 220 characters (it was ~900 as plain JSON), which is short enough to type, paste, or scan from the QR code shown on the record screens. Links made by earlier versions still open.
+
+Acknowledging a shared copy timestamps that copy on the receiving device; syncing both copies requires the upcoming Phase 3 backend.
 
 ## 🤝 Contributing
 

@@ -6,6 +6,7 @@ import { useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
 import { RecordSummary } from "@/components/RecordSummary";
 import { PartyList } from "@/components/PartyList";
+import { ShareQr } from "@/components/ShareQr";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
 interface TruthPendingCardProps {
@@ -60,15 +61,21 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
         </div>
 
         <div className="mt-3 rounded-xl border border-line bg-surface-2/60 p-4">
-          <p className="text-sm font-semibold text-ink">Share link</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs text-ink-2 ring-1 ring-line">{shareUrl ?? "Preparing the link…"}</code>
-            <Button variant="quiet" size="sm" className="shrink-0" disabled={!shareUrl} onClick={() => shareUrl && copy(shareUrl, "link")}>
-              {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied === "link" ? "Copied" : "Copy link"}
-            </Button>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-ink">Share link</p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs text-ink-2 ring-1 ring-line">{shareUrl ?? "Preparing the link…"}</code>
+                <Button variant="quiet" size="sm" className="shrink-0" disabled={!shareUrl} onClick={() => shareUrl && copy(shareUrl, "link")}>
+                  {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied === "link" ? "Copied" : "Copy link"}
+                </Button>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-ink-3">The link carries the record itself, so it opens on any device — even if {otherParty} has never visited TruthCap.</p>
+            </div>
+
+            <ShareQr value={shareUrl} size={168} caption={`Let ${otherParty} scan this`} className="self-center sm:self-start" />
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-ink-3">The link carries the record itself, so it opens on any device — even if {otherParty} has never visited TruthCap.</p>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">

@@ -1,4 +1,5 @@
 import { getTemplate } from "@/data/templates";
+import { decodePayload, encodePayload } from "@/lib/payload";
 import { isCaptureRecord } from "@/lib/storage";
 import type { TruthCapture, TruthStatus } from "@/types/truth";
 
@@ -7,10 +8,12 @@ import type { TruthCapture, TruthStatus } from "@/types/truth";
  * device without an account or a server. Everything after the `#` stays in the
  * browser — it is never sent to a host.
  *
- * To keep links short the payload uses short keys and is deflated before being
- * base64url-encoded. Older uncompressed links still decode.
+ * The record is packed into a binary payload (see `payload.ts`) and deflated
+ * before being base64url-encoded. Links made by earlier versions — deflated
+ * JSON, plain JSON, and the original `{ v: 1, record }` blob — still decode.
  */
 const COMPRESSED_PREFIX = "z";
+const RAW_BINARY_PREFIX = "b";
 const PLAIN_PREFIX = "j";
 const MAX_ENCODED_LENGTH = 12000;
 const MAX_TEXT_LENGTH = 40000;
@@ -18,6 +21,7 @@ const STATUSES: TruthStatus[] = ["draft", "pending", "acknowledged", "expired", 
 
 type PartyTuple = [role: string, name: string, contact: string, acknowledged: string | 0];
 
+/** The JSON envelope, used for templates this version does not know about. */
 interface CompactRecord {
   v: 2;
   i: string;
@@ -38,6 +42,7 @@ interface LegacyPayload {
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const JSON_START = 0x7b; // "{"
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -62,11 +67,11 @@ function base64UrlToBytes(value: string): Uint8Array | null {
   }
 }
 
-async function deflate(text: string): Promise<Uint8Array | null> {
+async function deflateBytes(bytes: Uint8Array): Promise<Uint8Array | null> {
   if (typeof CompressionStream === "undefined") return null;
 
   try {
-    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    const stream = new Blob([toArrayBuffer(bytes)]).stream().pipeThrough(new CompressionStream("deflate-raw"));
     return new Uint8Array(await new Response(stream).arrayBuffer());
   } catch {
     return null;
@@ -77,12 +82,12 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-async function inflate(bytes: Uint8Array): Promise<string | null> {
+async function inflateBytes(bytes: Uint8Array): Promise<Uint8Array | null> {
   if (typeof DecompressionStream === "undefined") return null;
 
   try {
     const stream = new Blob([toArrayBuffer(bytes)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-    return await new Response(stream).text();
+    return new Uint8Array(await new Response(stream).arrayBuffer());
   } catch {
     return null;
   }
@@ -148,38 +153,7 @@ function expand(payload: unknown): TruthCapture | null {
   return isCaptureRecord(capture) ? capture : null;
 }
 
-/** Older browsers without DecompressionStream cannot open compressed links. */
-export function canDecodeCompressedLinks(): boolean {
-  return typeof DecompressionStream !== "undefined";
-}
-
-export async function encodeRecord(capture: TruthCapture): Promise<string> {
-  const text = JSON.stringify(compress(capture));
-  const bytes = await deflate(text);
-
-  if (!bytes) return `${PLAIN_PREFIX}${bytesToBase64Url(textEncoder.encode(text))}`;
-  return `${COMPRESSED_PREFIX}${bytesToBase64Url(bytes)}`;
-}
-
-export async function decodeRecord(encoded: string): Promise<TruthCapture | null> {
-  const value = encoded.trim();
-  if (!value || value.length > MAX_ENCODED_LENGTH) return null;
-  if (!/^[A-Za-z0-9\-_]+$/.test(value)) return null;
-
-  let text: string | null;
-
-  if (value.startsWith(COMPRESSED_PREFIX)) {
-    const bytes = base64UrlToBytes(value.slice(1));
-    text = bytes ? await inflate(bytes) : null;
-  } else if (value.startsWith(PLAIN_PREFIX)) {
-    const bytes = base64UrlToBytes(value.slice(1));
-    text = bytes ? textDecoder.decode(bytes) : null;
-  } else {
-    // Links created before compression existed: plain base64url of { v: 1, record }.
-    const bytes = base64UrlToBytes(value);
-    text = bytes ? textDecoder.decode(bytes) : null;
-  }
-
+function fromJson(text: string | null): TruthCapture | null {
   if (!text || text.length > MAX_TEXT_LENGTH) return null;
 
   try {
@@ -195,4 +169,56 @@ export async function decodeRecord(encoded: string): Promise<TruthCapture | null
   } catch {
     return null;
   }
+}
+
+/** Older browsers without DecompressionStream cannot open compressed links. */
+export function canDecodeCompressedLinks(): boolean {
+  return typeof DecompressionStream !== "undefined";
+}
+
+export async function encodeRecord(capture: TruthCapture): Promise<string> {
+  const template = getTemplate(capture.templateId);
+  const binary = template ? encodePayload(capture, template) : null;
+
+  if (binary) {
+    const compressed = await deflateBytes(binary);
+    // Deflate costs a couple of bytes of framing; short records do better raw.
+    if (compressed && compressed.length < binary.length) return `${COMPRESSED_PREFIX}${bytesToBase64Url(compressed)}`;
+    return `${RAW_BINARY_PREFIX}${bytesToBase64Url(binary)}`;
+  }
+
+  const text = JSON.stringify(compress(capture));
+  const compressed = await deflateBytes(textEncoder.encode(text));
+
+  if (!compressed) return `${PLAIN_PREFIX}${bytesToBase64Url(textEncoder.encode(text))}`;
+  return `${COMPRESSED_PREFIX}${bytesToBase64Url(compressed)}`;
+}
+
+export async function decodeRecord(encoded: string): Promise<TruthCapture | null> {
+  const value = encoded.trim();
+  if (!value || value.length > MAX_ENCODED_LENGTH) return null;
+  if (!/^[A-Za-z0-9\-_]+$/.test(value)) return null;
+
+  if (value.startsWith(COMPRESSED_PREFIX)) {
+    const bytes = base64UrlToBytes(value.slice(1));
+    const inflated = bytes ? await inflateBytes(bytes) : null;
+    if (!inflated || inflated.length === 0) return null;
+
+    // Deflated JSON from earlier versions starts with "{".
+    return inflated[0] === JSON_START ? fromJson(textDecoder.decode(inflated)) : decodePayload(inflated);
+  }
+
+  if (value.startsWith(RAW_BINARY_PREFIX)) {
+    const bytes = base64UrlToBytes(value.slice(1));
+    return bytes ? decodePayload(bytes) : null;
+  }
+
+  if (value.startsWith(PLAIN_PREFIX)) {
+    const bytes = base64UrlToBytes(value.slice(1));
+    return fromJson(bytes ? textDecoder.decode(bytes) : null);
+  }
+
+  // Links created before compression existed: plain base64url of { v: 1, record }.
+  const bytes = base64UrlToBytes(value);
+  return fromJson(bytes ? textDecoder.decode(bytes) : null);
 }

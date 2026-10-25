@@ -21,6 +21,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^14.6.0",
     "lucide-react": "^0.474.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.6.0",

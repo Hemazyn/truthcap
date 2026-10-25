@@ -25,6 +25,10 @@ async function createPendingRecord(page: Page): Promise<{ title: string; shareUr
   await expect(link).toHaveText(/\/shared#[A-Za-z0-9\-_]+$/);
   const shareUrl = (await link.innerText()).trim();
 
+  // The link has to stay small enough to type, paste or scan.
+  expect(shareUrl.length).toBeLessThan(300);
+  await expect(page.getByRole("img", { name: "QR code for the share link" })).toBeVisible();
+
   return { title: "Item condition agreed", shareUrl };
 }
 
@@ -61,6 +65,8 @@ test("creates, shares and acknowledges a record that survives reload", async ({ 
   await expect(page.getByText("Acknowledged by both", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/record\/trc_/);
   await expect(page.getByText("₦420,000")).toBeVisible();
+
+  await expect(page.getByRole("img", { name: "QR code for the share link" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("Acknowledged by both", { exact: true })).toBeVisible();
