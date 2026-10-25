@@ -8,6 +8,7 @@ export * from "./RecordsPage";
 export * from "./ScrollProgress";
 export * from "./ShareQr";
 export * from "./SharedRecordPage";
+export * from "./ShortRecordPage";
 export * from "./TruthAcknowledgePage";
 export * from "./TruthCaptureForm";
 export * from "./TruthCreateStep";

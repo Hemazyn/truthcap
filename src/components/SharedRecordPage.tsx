@@ -12,7 +12,13 @@ import { RecordSummary } from "@/components/RecordSummary";
 import { PartyList } from "@/components/PartyList";
 import type { TruthCapture } from "@/types/truth";
 
-export function SharedRecordPage({ data }: { data: string }) {
+interface SharedRecordPageProps {
+  data: string;
+  /** `server` means the payload came from a stored short link. */
+  source?: "link" | "server";
+}
+
+export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProps) {
   const importRecord = useTruthStore((state) => state.importRecord);
   const acknowledge = useTruthStore((state) => state.acknowledge);
   const [justAcknowledged, setJustAcknowledged] = useState(false);
@@ -72,7 +78,7 @@ export function SharedRecordPage({ data }: { data: string }) {
     <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-12">
       <div className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3.5 print:hidden">
         <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-700" />
-        <p className="text-xs leading-relaxed font-medium text-brand-900">This is a shared copy. The record travels inside the link itself — nothing is stored on a server, and nobody sees it unless you forward the link. Print or save it if you want to keep it after closing the tab.</p>
+        <p className="text-xs leading-relaxed font-medium text-brand-900">{source === "server" ? "This is a shared copy, opened from TruthCap's storage where it stays for 90 days. Anyone with the link can read it, so forward it the way you would the record itself. Print or save it if you want to keep it after that." : "This is a shared copy. The record travels inside the link itself — nothing is stored on a server, and nobody sees it unless you forward the link. Print or save it if you want to keep it after closing the tab."}</p>
       </div>
 
       <div className="mt-6 overflow-hidden rounded-3xl border border-line bg-surface shadow-(--shadow-pop)">

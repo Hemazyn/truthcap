@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export type Route = { name: "home" } | { name: "create" } | { name: "records" } | { name: "acknowledge"; code: string } | { name: "record"; id: string } | { name: "shared"; data: string } | { name: "not-found" };
+export type Route = { name: "home" } | { name: "create" } | { name: "records" } | { name: "acknowledge"; code: string } | { name: "record"; id: string } | { name: "shared"; data: string } | { name: "short"; id: string } | { name: "not-found" };
 
 export const routes = {
   home: () => "/",
@@ -10,6 +10,8 @@ export const routes = {
   record: (id: string) => `/record/${encodeURIComponent(id)}`,
   /** The record payload rides in the fragment so hosts never see it. */
   shared: (data: string) => `/shared#${data}`,
+  /** A stored record: the link stays short and the payload comes from the API. */
+  short: (id: string) => `/s/${encodeURIComponent(id)}`,
 };
 
 const NAVIGATION_EVENT = "truthcap:navigate";
@@ -25,6 +27,9 @@ export function parsePath(pathname: string, hash = ""): Route {
   if (section === "records" && !param && rest.length === 0) return { name: "records" };
   if (section === "shared" && !param && rest.length === 0) {
     return { name: "shared", data: hash.replace(/^#/, "") };
+  }
+  if (section === "s" && param && rest.length === 0) {
+    return { name: "short", id: decodeURIComponent(param) };
   }
   if (section === "acknowledge" && param && rest.length === 0) {
     return { name: "acknowledge", code: decodeURIComponent(param).toUpperCase() };

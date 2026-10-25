@@ -20,7 +20,8 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
   const code = capture.accessCode ?? "";
-  const shareUrl = useShareUrl(capture);
+  const share = useShareUrl(capture);
+  const shareUrl = share.url;
   const otherParty = capture.parties[1]?.name?.trim() || "the other person";
 
   const copy = (value: string, kind: "code" | "link") => {
@@ -71,10 +72,10 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
                   {copied === "link" ? "Copied" : "Copy link"}
                 </Button>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-ink-3">The link carries the record itself, so it opens on any device — even if {otherParty} has never visited TruthCap.</p>
+              <p className="mt-2 text-xs leading-relaxed text-ink-3">{share.viaServer ? `This short link opens on any device and stays available for 90 days — ${otherParty} needs no account. It is kept on TruthCap's storage until then, so anyone with the link can read it.` : `The record travels inside the link itself, so it opens on any device — even if ${otherParty} has never visited TruthCap. Nothing is stored on a server.`}</p>
             </div>
 
-            <ShareQr value={shareUrl} size={168} caption={`Let ${otherParty} scan this`} className="self-center sm:self-start" />
+            <ShareQr value={shareUrl} size={120} caption={`Let ${otherParty} scan this`} className="self-center sm:self-start" />
           </div>
         </div>
 

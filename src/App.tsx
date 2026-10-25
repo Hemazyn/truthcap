@@ -9,6 +9,7 @@ import { TruthAcknowledgePage } from "@/components/TruthAcknowledgePage";
 import { TruthRecordPage } from "@/components/TruthRecordPage";
 import { RecordsPage } from "@/components/RecordsPage";
 import { SharedRecordPage } from "@/components/SharedRecordPage";
+import { ShortRecordPage } from "@/components/ShortRecordPage";
 import { Button } from "@/components/ui/Button";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -45,7 +46,7 @@ export default function App() {
   }, [route]);
 
   useEffect(() => {
-    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
+    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" || route.name === "short" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
 
     document.title = title;
   }, [route, records]);
@@ -75,7 +76,7 @@ export default function App() {
   };
 
   const onHome = route.name === "home";
-  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name;
+  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name === "short" ? `${route.name}-${route.id}` : route.name;
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -144,6 +145,8 @@ export default function App() {
           {route.name === "records" && <RecordsPage />}
 
           {route.name === "shared" && <SharedRecordPage data={route.data} />}
+
+          {route.name === "short" && <ShortRecordPage id={route.id} />}
 
           {route.name === "not-found" && <NotFoundPage />}
         </motion.main>

@@ -17,7 +17,7 @@ interface TruthRecordCardProps {
 export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
   const [copied, setCopied] = useState<"summary" | "link" | null>(null);
 
-  const shareUrl = useShareUrl(capture);
+  const { url: shareUrl } = useShareUrl(capture);
   const acknowledgedAt = capture.acknowledgment?.when ?? null;
   const currency = typeof capture.values.currency === "string" ? capture.values.currency : "NGN";
 
@@ -91,7 +91,7 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
           {acknowledgedAt && <p className="mt-4 rounded-xl bg-brand-50 px-3 py-2.5 text-xs leading-relaxed text-brand-800 ring-1 ring-brand-100">Timestamped {formatDate(acknowledgedAt)} — both sides hold the same copy.</p>}
 
           <div className="mt-4 rounded-xl border border-line bg-surface-2/50 p-3">
-            <ShareQr value={shareUrl} size={168} caption="Scan to open this record on a phone" />
+            <ShareQr value={shareUrl} size={120} caption="Scan to open this record on a phone" />
           </div>
         </div>
       </div>

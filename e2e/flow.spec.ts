@@ -22,11 +22,11 @@ async function createPendingRecord(page: Page): Promise<{ title: string; shareUr
 
   await expect(page.getByRole("heading", { name: "Send Bola the code" })).toBeVisible();
   const link = page.locator("code").first();
-  await expect(link).toHaveText(/\/shared#[A-Za-z0-9\-_]+$/);
+  await expect(link).toHaveText(/\/s\/[23456789abcdefghijkmnpqrstuvwxyz]{8}$/);
   const shareUrl = (await link.innerText()).trim();
 
-  // The link has to stay small enough to type, paste or scan.
-  expect(shareUrl.length).toBeLessThan(300);
+  // The link has to stay small enough to type out or read over the phone.
+  expect(shareUrl.length).toBeLessThan(80);
   await expect(page.getByRole("img", { name: "QR code for the share link" })).toBeVisible();
 
   return { title: "Item condition agreed", shareUrl };
@@ -136,7 +136,7 @@ test("shows an empty state for an unknown acknowledgment code", async ({ page })
 
 test("lists records on /records and opens one", async ({ page }) => {
   const { title, shareUrl } = await createPendingRecord(page);
-  expect(shareUrl).toMatch(/\/shared#[A-Za-z0-9\-_]+$/);
+  expect(shareUrl).toMatch(/\/s\/[23456789abcdefghijkmnpqrstuvwxyz]{8}$/);
 
   await page.getByRole("button", { name: "Records", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Records on this device" })).toBeVisible();
@@ -163,6 +163,7 @@ test("a share link opens the record on another device", async ({ page, browser }
   await expect(otherPage.getByRole("heading", { name: title })).toBeVisible();
   await expect(otherPage.getByText("₦420,000")).toBeVisible();
   await expect(otherPage.getByText("Waiting for acknowledgment")).toBeVisible();
+  await expect(otherPage.getByText(/stays for 90 days/)).toBeVisible();
 
   await otherPage.getByRole("button", { name: "Acknowledge this copy" }).click();
   await expect(otherPage.getByText("Acknowledged by both", { exact: true })).toBeVisible();
@@ -181,4 +182,10 @@ test("a share link opens the record on another device", async ({ page, browser }
 test("explains a damaged share link", async ({ page }) => {
   await page.goto("/shared#not-a-real-payload");
   await expect(page.getByRole("heading", { name: "This link is incomplete" })).toBeVisible();
+});
+
+test("explains a short link that has expired or never existed", async ({ page }) => {
+  await page.goto("/s/abcd2345");
+  await expect(page.getByRole("heading", { name: "We can't find that record" })).toBeVisible();
+  await expect(page.getByText(/expire 90 days/)).toBeVisible();
 });
