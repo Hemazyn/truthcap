@@ -1,139 +1,141 @@
 # TruthCap
 
-A shared, timestamped record of what two people agreed.
+**What you agreed, written down. Both keep a copy.**
 
-TruthCap turns a real-life agreement — a used item's condition, a repair quote, a delivery, a
-payment plan, a handover — into a plain-language record that both sides read and acknowledge. It
-sits between a chat screenshot (too weak) and a formal contract (too heavy). Both people keep a
-copy.
+TruthCap turns everyday agreements — a used item's condition, a repair quote, a delivery, a payment plan, or a handover — into a plain-language, timestamped record that both parties read and acknowledge. It sits between a chat screenshot (too weak) and a formal contract (too heavy).
 
-**Current stage:** Phase 2 (durable records and real sharing) is complete. Records persist in the
-browser, every screen has an address, and the acknowledge route restores from a share link. Phase 3
-(backend and server acknowledgment) is next. See [docs/ROADMAP.md](docs/ROADMAP.md).
+[![Built with React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
-## Stack
+## ✨ Features
 
-| Layer      | Choice                                                               |
-| ---------- | -------------------------------------------------------------------- |
-| UI         | React 19, TypeScript 5                                               |
-| Build      | Vite 8 (`@vitejs/plugin-react`)                                      |
-| Styling    | Tailwind CSS 4 via `@tailwindcss/vite`, design tokens in `@theme`    |
-| State      | Zustand 5 with a versioned `localStorage` adapter                    |
-| Icons      | lucide-react                                                         |
-| Class util | `clsx` + `tailwind-merge` (`cn`)                                     |
-| Formatting | Prettier 3 with `prettier-plugin-tailwindcss`                        |
-| Linting    | ESLint 10 flat config, typescript-eslint, react-hooks, react-refresh |
-| Unit tests | Vitest (node environment with storage stubs)                         |
-| E2E tests  | Playwright against the local Chrome channel                          |
+- **Template-based agreements** - Five pre-built templates for the most common real-life scenarios
+- **Plain-language records** - Write agreements in words both people understand, no legal jargon
+- **Mutual acknowledgment** - Both parties must read and acknowledge with timestamped proof
+- **Share by link or code** - The share link carries the record itself, so it opens on any device, no account required
+- **Records page** - Every record saved in this browser, searchable and filterable by status
+- **Local-first & private** - Records live in your browser's localStorage until Phase 3 backend arrives
+- **Portable** - Copy as text, copy the link, or print/save as PDF
+- **Clean, mobile-friendly** - Works great on any device
 
-## Getting started
+## 🚀 Quick Start
 
-Requires Node.js 20+ and npm.
+### Prerequisites
+
+- Node.js 20+
+- npm, yarn, or pnpm
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/hemazyn/truthcap.git
+cd truthcap
+
+# Install dependencies
 npm install
-npm run dev        # http://localhost:5173
+
+# Start development server
+npm run dev
 ```
 
-### Scripts
+Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
 
-| Script                 | What it does                                                 |
-| ---------------------- | ------------------------------------------------------------ |
-| `npm run dev`          | Vite dev server with HMR                                     |
-| `npm run build`        | Type-check the project (`tsc -b`) then build to `dist/`      |
-| `npm run preview`      | Serve the production build                                   |
-| `npm run lint`         | ESLint over source, tests and configs                        |
-| `npm run typecheck`    | `tsc --noEmit`                                               |
-| `npm run test`         | Vitest unit tests (store lifecycle, validation, formatting)  |
-| `npm run test:watch`   | Vitest in watch mode                                         |
-| `npm run test:e2e`     | Playwright smoke tests (starts the dev server automatically) |
-| `npm run format`       | Prettier write, including Tailwind class sorting             |
-| `npm run format:check` | Prettier check (use in CI)                                   |
+## 🛠️ Tech Stack
 
-Playwright uses the locally installed Chrome (`channel: "chrome"`), so no browser download is
-required.
+| Layer                | Technology                                                            | Purpose                                         |
+| -------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
+| **Framework**        | [React 19](https://react.dev/)                                        | UI library with latest features                 |
+| **Language**         | [TypeScript 5](https://www.typescriptlang.org/)                       | Type-safe development                           |
+| **Build Tool**       | [Vite 8](https://vitejs.dev/)                                         | Fast dev server and optimized builds            |
+| **Styling**          | [Tailwind CSS 4](https://tailwindcss.com/)                            | Utility-first CSS with design tokens            |
+| **State Management** | [Zustand 5](https://zustand-demo.pmnd.rs/)                            | Lightweight state with localStorage persistence |
+| **Animations**       | [Framer Motion](https://www.framer.com/motion/)                       | Smooth, accessible animations                   |
+| **Icons**            | [Lucide React](https://lucide.dev/)                                   | Beautiful, consistent icons                     |
+| **Testing**          | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | Unit and E2E testing                            |
 
-## Project structure
+## 📁 Project Structure
 
 ```
 truthcap/
-├── public/
-│   └── icon.svg               # brand mark / favicon
+├── public/              # Static assets (favicon, icons)
 ├── src/
-│   ├── App.tsx                # shell, routing, header and footer
-│   ├── components/
-│   │   ├── HomePage.tsx       # landing page content
-│   │   ├── PhonePreview.tsx   # auto-playing hero widget
-│   │   ├── TruthCreateStep.tsx# pick → fill → share step machine
-│   │   ├── TruthTemplatePicker.tsx
-│   │   ├── TruthCaptureForm.tsx
-│   │   ├── TruthFieldInput.tsx
-│   │   ├── TruthPendingCard.tsx    # pending record, code and share link
-│   │   ├── TruthAcknowledgePage.tsx# /acknowledge/:code
-│   │   ├── TruthRecordPage.tsx     # /record/:id
-│   │   ├── TruthRecordCard.tsx     # final acknowledged document
-│   │   ├── RecordSummary.tsx       # shared read-only value table
-│   │   ├── PartyList.tsx           # parties with acknowledgment state
-│   │   ├── RecordNotFound.tsx      # empty and error states
-│   │   ├── TruthInstructions.tsx
-│   │   └── ui/                     # Button, LogoMark
-│   ├── data/templates.ts      # the five record templates
-│   ├── lib/
-│   │   ├── router.ts          # hash routes and navigation
-│   │   ├── storage.ts         # versioned persistence adapter
-│   │   ├── records.ts         # lookups, share URLs, party helpers
-│   │   ├── validate.ts        # validation, currency and formatting
-│   │   └── utils.ts           # cn()
-│   ├── store/useTruthStore.ts # Zustand records, lifecycle actions, sync
-│   ├── types/truth.ts         # domain types
-│   ├── index.css              # Tailwind entry + design tokens
-│   └── main.tsx
-├── e2e/flow.spec.ts           # Playwright smoke coverage
-├── docs/                      # PRD, technical spec, design, roadmap
-├── eslint.config.js
-├── playwright.config.ts
-├── vitest.config.ts / vitest.setup.ts
-└── index.html                 # fonts and metadata
+│   ├── components/      # React components
+│   │   ├── ui/         # Reusable UI primitives
+│   │   └── ...         # Feature components
+│   ├── data/           # Template definitions
+│   ├── lib/            # Utilities (router, storage, validation)
+│   ├── store/          # Zustand store
+│   ├── types/          # TypeScript type definitions
+│   ├── App.tsx         # App shell and routing
+│   ├── index.css       # Global styles and design tokens
+│   └── main.tsx        # Entry point
+├── e2e/                # End-to-end tests
+├── scripts/            # Repo tooling (brand image generation)
+└── index.html          # HTML template
 ```
 
-## Routes
+## 🗺️ Routes
 
-| Route                 | Screen                                                    |
-| --------------------- | --------------------------------------------------------- |
-| `#/`                  | Landing page                                              |
-| `#/create`            | Create flow; resumes the stored draft at the right step   |
-| `#/acknowledge/:code` | Read-only summary and acknowledgment for the other person |
-| `#/record/:id`        | Pending or acknowledged record document                   |
+| Route                | Description                                                       |
+| -------------------- | ----------------------------------------------------------------- |
+| `/`                  | Landing page with templates and how-it-works                      |
+| `/create`            | Multi-step record creation flow                                   |
+| `/records`           | Every record saved on this device, with search and status filters |
+| `/acknowledge/:code` | Acknowledgment page for the other party                           |
+| `/record/:id`        | View pending or completed record                                  |
+| `/shared#<payload>`  | Read-only copy opened from a share link, decoded in the browser   |
 
-## The flow
+## 🔄 How It Works
 
-1. **Pick the moment** — one of five templates (item condition, work delivered, repair, payment
-   schedule, handover).
-2. **Fill in the details** — required fields validate inline; both parties can be named with an
-   optional contact.
-3. **Share it** — the record becomes pending and gets a six-character code plus a share link.
-4. **Acknowledge** — the other person opens the link, reads the same summary, confirms the code, and
-   acknowledges. Both sides are stamped with the same timestamp.
-5. **Keep a copy** — the final record lives at `#/record/:id` and can be copied as text, copied as a
-   link, or printed/saved as PDF.
+1. **Pick a template** - Choose from five scenarios that match your agreement
+2. **Fill in details** - Add the specifics: what, condition, price, dates, parties
+3. **Share** - Generate a share link and 6-character code for the other person
+4. **Acknowledge** - The other party reviews and confirms the agreement
+5. **Keep copies** - Both parties have access to the timestamped final record
 
-State is persisted in `localStorage` under `truthcap.records.v1`, so a refresh, a new tab, or a
-reopened URL returns to the same record. Cross-device acknowledgment requires the Phase 3 backend.
+## 📜 Available Scripts
 
-## Documentation
+| Script                 | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `npm run dev`          | Start development server with hot reload             |
+| `npm run build`        | Type-check and build for production                  |
+| `npm run preview`      | Preview production build locally                     |
+| `npm run lint`         | Run ESLint                                           |
+| `npm run typecheck`    | Run TypeScript type checking                         |
+| `npm run test`         | Run unit tests with Vitest                           |
+| `npm run test:watch`   | Run tests in watch mode                              |
+| `npm run test:e2e`     | Run E2E tests with Playwright                        |
+| `npm run images`       | Regenerate `og-image.png` and `apple-touch-icon.png` |
+| `npm run format`       | Format code with Prettier                            |
+| `npm run format:check` | Check code formatting                                |
 
-| Document                               | Purpose                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------- |
-| [docs/PRD.md](docs/PRD.md)             | Product requirements: users, jobs, requirements, metrics                |
-| [docs/TECHNICAL.md](docs/TECHNICAL.md) | Architecture, routing, persistence, state machine, tooling, limitations |
-| [docs/DESIGN.md](docs/DESIGN.md)       | Brand, tokens, components, motion, voice and tone                       |
-| [docs/ROADMAP.md](docs/ROADMAP.md)     | Phase-by-phase plan and the gate to move to the next phase              |
+## 💾 Data Storage
 
-## Conventions
+All records are stored locally in your browser under `localStorage` key `truthcap.records.v1`. Data never leaves your device in the current version.
 
-- TypeScript strict mode; no `any` in application code.
-- Tailwind utilities only — no component CSS files; tokens live in `src/index.css`.
-- Class strings go through `cn()` when conditional.
-- Store changes go through actions that persist; never write to `localStorage` from components.
-- Run `npm run lint`, `npm run test`, `npm run typecheck` and `npm run format` before committing.
-- Copy is plain and calm. Never describe the product as a demo, prototype or mock.
+Share links (`/shared#…`) carry a compressed (deflate-raw), base64url-encoded copy of the record in the URL fragment — about half the length of the plain JSON and never sent to a host — so the other person can open it on their device without a server. Older uncompressed links still open. Acknowledging a shared copy timestamps that copy on their device; syncing both copies requires the upcoming Phase 3 backend.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 Code Conventions
+
+- TypeScript strict mode - no `any` in application code
+- Tailwind CSS utilities only - design tokens in `src/index.css`
+- Use `cn()` utility for conditional class names
+- All store mutations go through Zustand actions with persistence
+- Follow the existing code style (enforced by ESLint and Prettier)
+
+## 📄 License
+
+This project is private and proprietary.

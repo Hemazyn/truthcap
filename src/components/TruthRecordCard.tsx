@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Check, CheckCircle2, Copy, Link2, Printer } from "lucide-react";
 import { formatDate, formatFieldValue } from "@/lib/validate";
-import { recordUrlFor } from "@/lib/records";
+import { shareUrlFor } from "@/lib/records";
+import { printRecord } from "@/lib/print";
 import { Button } from "@/components/ui/Button";
 import { RecordSummary } from "@/components/RecordSummary";
 import { PartyList } from "@/components/PartyList";
@@ -38,30 +39,13 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
   };
 
   const copyLink = () => {
-    navigator.clipboard
-      .writeText(recordUrlFor(capture.id))
+    shareUrlFor(capture)
+      .then((url) => navigator.clipboard.writeText(url))
       .then(() => {
         setCopied("link");
         window.setTimeout(() => setCopied(null), 2000);
       })
       .catch(() => {});
-  };
-
-  const handlePrint = () => {
-    const projectName = "TruthCap";
-    const parties = capture.parties || [];
-    const firstParty = parties[0]?.name?.trim() || parties[0]?.role || "Party1";
-    const secondParty = parties[1]?.name?.trim() || parties[1]?.role || "Party2";
-    const sanitize = (str: string) => str.replace(/[^a-zA-Z0-9\-_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-    const filename = `${sanitize(projectName)}_${sanitize(firstParty)}-${sanitize(secondParty)}.pdf`;
-    const originalTitle = document.title;
-    document.title = filename.replace(/\.pdf$/, "");
-    const handleAfterPrint = () => {
-      document.title = originalTitle;
-      window.removeEventListener("afterprint", handleAfterPrint);
-    };
-    window.addEventListener("afterprint", handleAfterPrint);
-    window.print();
   };
 
   return (
@@ -111,9 +95,9 @@ export function TruthRecordCard({ capture, template }: TruthRecordCardProps) {
         </Button>
         <Button variant="secondary" size="sm" onClick={copyLink}>
           {copied === "link" ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-          {copied === "link" ? "Link copied" : "Copy record link"}
+          {copied === "link" ? "Link copied" : "Copy share link"}
         </Button>
-        <Button variant="secondary" size="sm" onClick={handlePrint}>
+        <Button variant="secondary" size="sm" onClick={() => printRecord(capture)}>
           <Printer className="h-4 w-4" />
           Print / save PDF
         </Button>

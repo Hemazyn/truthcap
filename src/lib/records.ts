@@ -1,5 +1,6 @@
 import { getTemplate } from "@/data/templates";
 import { routes } from "@/lib/router";
+import { encodeRecord } from "@/lib/share";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
 export function findRecord(records: TruthCapture[], id: string): TruthCapture | null {
@@ -21,9 +22,13 @@ export function templateFor(capture: TruthCapture | null): TruthTemplate | null 
   return getTemplate(capture.templateId) ?? null;
 }
 
-export function shareUrlFor(code: string): string {
+/**
+ * A link anyone can open: the record travels inside the URL fragment, so it
+ * works on another device without an account or a server.
+ */
+export async function shareUrlFor(capture: TruthCapture): Promise<string> {
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  return `${origin}${routes.acknowledge(code)}`;
+  return `${origin}${routes.shared(await encodeRecord(capture))}`;
 }
 
 export function recordUrlFor(id: string): string {

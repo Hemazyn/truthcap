@@ -7,6 +7,8 @@ import { HomePage } from "@/components/HomePage";
 import { TruthCreateStep } from "@/components/TruthCreateStep";
 import { TruthAcknowledgePage } from "@/components/TruthAcknowledgePage";
 import { TruthRecordPage } from "@/components/TruthRecordPage";
+import { RecordsPage } from "@/components/RecordsPage";
+import { SharedRecordPage } from "@/components/SharedRecordPage";
 import { Button } from "@/components/ui/Button";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ScrollProgress } from "@/components/ScrollProgress";
@@ -42,6 +44,12 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [route]);
 
+  useEffect(() => {
+    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
+
+    document.title = title;
+  }, [route, records]);
+
   const jumpTo = (id: string) => {
     const scroll = () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -67,6 +75,7 @@ export default function App() {
   };
 
   const onHome = route.name === "home";
+  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name;
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -86,32 +95,40 @@ export default function App() {
             <Logo />
           </a>
 
-          {onHome ? (
-            <div className="flex items-center gap-2">
-              <nav className="mr-2 hidden items-center gap-6 text-sm font-medium text-ink-2 sm:flex">
-                <button type="button" onClick={() => jumpTo("how")} className="hover:text-ink">
-                  How it works
-                </button>
-                <button type="button" onClick={() => jumpTo("templates")} className="hover:text-ink">
-                  Templates
-                </button>
-              </nav>
+          <div className="flex items-center gap-2">
+            <nav className="mr-1 flex items-center gap-5 text-sm font-medium text-ink-2">
+              {onHome && (
+                <>
+                  <button type="button" onClick={() => jumpTo("how")} className="hidden hover:text-ink sm:inline">
+                    How it works
+                  </button>
+                  <button type="button" onClick={() => jumpTo("templates")} className="hidden hover:text-ink sm:inline">
+                    Templates
+                  </button>
+                </>
+              )}
+              <button type="button" onClick={() => navigate(routes.records())} aria-current={route.name === "records" ? "page" : undefined} className={route.name === "records" ? "text-ink" : "hover:text-ink"}>
+                Records
+              </button>
+            </nav>
+
+            {onHome ? (
               <Button size="sm" onClick={() => startRecord()}>
                 Create a record
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
-            </div>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={() => navigate(routes.home())}>
-              <ArrowLeft className="h-4 w-4" />
-              Back home
-            </Button>
-          )}
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => navigate(routes.home())}>
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back home</span>
+              </Button>
+            )}
+          </div>
         </div>
       </motion.header>
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.main key={`${route.name}-${route.name === "acknowledge" ? route.code : route.name === "record" ? route.id : ""}`} className="flex-1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+        <motion.main key={routeKey} className="flex-1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
           {route.name === "home" && <HomePage onStart={startRecord} />}
 
           {route.name === "create" && (
@@ -123,6 +140,10 @@ export default function App() {
           {route.name === "acknowledge" && <TruthAcknowledgePage code={route.code} />}
 
           {route.name === "record" && <TruthRecordPage id={route.id} />}
+
+          {route.name === "records" && <RecordsPage />}
+
+          {route.name === "shared" && <SharedRecordPage data={route.data} />}
 
           {route.name === "not-found" && <NotFoundPage />}
         </motion.main>
@@ -161,6 +182,11 @@ export default function App() {
                 <li>
                   <button type="button" onClick={() => jumpTo("why")} className="hover:text-brand-700">
                     Why TruthCap
+                  </button>
+                </li>
+                <li>
+                  <button type="button" onClick={() => navigate(routes.records())} className="hover:text-brand-700">
+                    Your records
                   </button>
                 </li>
               </ul>

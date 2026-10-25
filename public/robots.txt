@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://truthcap.vercel.app/sitemap.xml
