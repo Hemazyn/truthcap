@@ -1,0 +1,267 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef7f1;
+  --color-brand-100: #d8eee0;
+  --color-brand-200: #b2dcc3;
+  --color-brand-300: #84c39e;
+  --color-brand-400: #4fa477;
+  --color-brand-500: #2b8a57;
+  --color-brand-600: #1c6f43;
+  --color-brand-700: #175a37;
+  --color-brand-800: #14472e;
+  --color-brand-900: #113a27;
+  --color-brand-950: #072115;
+
+  --color-accent-50: #fffaeb;
+  --color-accent-100: #fef2c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #fbbf24;
+  --color-accent-500: #f59e0b;
+  --color-accent-600: #d97706;
+  --color-accent-700: #b45309;
+  --color-accent-800: #92400e;
+  --color-accent-900: #78350f;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgb(9 33 19 / 0.04), 0 4px 16px -4px rgb(9 33 19 / 0.06);
+  --shadow-pop: 0 8px 24px -6px rgb(9 33 19 / 0.12), 0 24px 64px -16px rgb(9 33 19 / 0.2);
+  --shadow-cta: 0 1px 2px rgb(9 33 19 / 0.2), 0 8px 20px -8px color-mix(in srgb, var(--color-brand-600) 60%, transparent);
+  --shadow-cta-hover: 0 2px 4px rgb(9 33 19 / 0.2), 0 12px 28px -8px color-mix(in srgb, var(--color-brand-600) 70%, transparent);
+  --shadow-accent: 0 1px 2px rgb(120 53 15 / 0.2), 0 10px 24px -10px color-mix(in srgb, var(--color-accent-500) 70%, transparent);
+}
+
+:root {
+  --canvas: #f5f9f6;
+  --surface: #ffffff;
+  --surface-2: #edf4ef;
+  --ink: #0d1a12;
+  --ink-2: #44584c;
+  --ink-3: #76897d;
+  --ink-inverse: #f4faf6;
+  --line: #e1ebe4;
+  --line-strong: #cddcd2;
+}
+
+.dark {
+  --canvas: #07100a;
+  --surface: #0c1711;
+  --surface-2: #12251a;
+  --ink: #eaf5ee;
+  --ink-2: #a4beb0;
+  --ink-3: #6f8b7a;
+  --ink-inverse: #f4faf6;
+  --line: #182c20;
+  --line-strong: #25412f;
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem;
+}
+
+button:not(:disabled),
+[role="button"]:not(:disabled),
+a[href],
+label[for],
+select,
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-feature-settings:
+    "ss01" on,
+    "cv01" on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-brand-200);
+  color: var(--color-brand-950);
+}
+
+.dark ::selection {
+  background: var(--color-brand-700);
+  color: var(--color-brand-50);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: auto;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* Hide non-essential UI elements */
+  header,
+  footer,
+  nav,
+  [role="progressbar"],
+  .scroll-progress,
+  button:not(.print-visible),
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* Ensure main content takes full width */
+  main {
+    flex: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Reset backgrounds and shadows for print */
+  .bg-canvas,
+  .bg-surface,
+  .bg-surface-2,
+  .bg-surface-2\/50,
+  .bg-brand-50,
+  .bg-brand-100 {
+    background: #ffffff !important;
+  }
+
+  /* Ensure borders are visible */
+  .border-line,
+  .border-brand-100 {
+    border-color: #cccccc !important;
+  }
+
+  /* Adjust text colors for print */
+  .text-ink,
+  .text-ink-2,
+  .text-ink-3,
+  .text-brand-700,
+  .text-brand-800,
+  .text-brand-900 {
+    color: #000000 !important;
+  }
+
+  /* Remove shadows */
+  .shadow-(--shadow-pop),
+  .shadow-(--shadow-card),
+  .shadow-(--shadow-cta) {
+    box-shadow: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .rounded-3xl,
+  .rounded-2xl,
+  .rounded-xl {
+    border-radius: 8px !important;
+  }
+
+  /* Avoid breaking inside important elements */
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  /* Ensure the record card prints cleanly */
+  [class*="TruthRecordCard"] {
+    page-break-inside: avoid;
+  }
+
+  /* Remove animations */
+  .screen-in,
+  .float-soft {
+    animation: none !important;
+  }
+
+  /* Ensure links are printed with their URLs if needed */
+  a[href]:after {
+    content: none !important;
+  }
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-in {
+  animation: screen-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.float-soft {
+  animation: float-soft 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .screen-in,
+  .float-soft {
+    animation: none;
+  }
+}
