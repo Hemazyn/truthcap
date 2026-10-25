@@ -70,8 +70,15 @@ describe("capture lifecycle", () => {
     expect(useTruthStore.getState().acknowledge(capture!.id, "WRONG1")).toBe(false);
     expect(getActive()?.status).toBe("pending");
 
-    const accepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase());
-    expect(accepted).toBe(true);
+    // First acknowledge: initiator (Ada) acknowledges, status stays pending
+    const firstAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase());
+    expect(firstAccepted).toBe(true);
+    expect(getActive()?.status).toBe("pending");
+    expect(getActive()?.acknowledgment?.who).toBe("Ada");
+
+    // Second acknowledge: other party (Bola) acknowledges, status becomes acknowledged
+    const secondAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase());
+    expect(secondAccepted).toBe(true);
 
     const acknowledged = getActive();
     expect(acknowledged?.status).toBe("acknowledged");
@@ -86,7 +93,15 @@ describe("capture lifecycle", () => {
     store.initiate();
 
     const firstId = getActive()!.id;
+    // First acknowledge: initiator acknowledges
     store.acknowledge(firstId, getActive()!.accessCode!);
+
+    // Second acknowledge: other party acknowledges (simulating the other person acknowledging)
+    // We need to get the record again since state changed
+    const record = useTruthStore.getState().records.find((r) => r.id === firstId);
+    if (record && record.status === "pending" && record.accessCode) {
+      store.acknowledge(record.id, record.accessCode);
+    }
 
     store.startCapture("repair-agreed");
     expect(useTruthStore.getState().records).toHaveLength(2);
@@ -96,6 +111,7 @@ describe("capture lifecycle", () => {
     expect(activeId).toBeNull();
     expect(records).toHaveLength(1);
     expect(records[0].id).toBe(firstId);
+    // After two acknowledges, status should be acknowledged
     expect(records[0].status).toBe("acknowledged");
   });
 

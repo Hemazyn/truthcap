@@ -211,7 +211,7 @@ export default function App() {
           </div>
 
           <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-line pt-6 sm:flex-row sm:items-center">
-            <p className="text-xs text-ink-3">© {new Date().getFullYear()} TruthCap. Built for real-life agreements.</p>
+            <p className="text-xs text-ink-3">Developed by <a href="https://iamtofunmi.vercel.app/" target="_blank" rel="noopener" className="underline underline-offset-2 text-brand-600">devEmma</a></p>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <p className="text-xs text-ink-3">Every record is timestamped and held by both people.</p>
               <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-brand-700">

@@ -158,13 +158,42 @@ export const useTruthStore = create<State & Actions>((set, get) => {
       if (record.accessCode.toUpperCase() !== code.trim().toUpperCase()) return false;
 
       const now = new Date().toISOString();
+      // Check if initiator (party 0) has already acknowledged
+      const party0Acknowledged = record.parties[0].acknowledged !== undefined;
+
+      // Determine new status and who to acknowledge
+      let newStatus: "pending" | "acknowledged";
+      let ackWho: string;
+
+      if (!party0Acknowledged) {
+        // First acknowledge: mark initiator (party 0)
+        newStatus = "pending";
+        ackWho = record.parties[0]?.name?.trim() || "The initiator";
+      } else {
+        // Second acknowledge: mark other party (party 1)
+        newStatus = "acknowledged";
+        ackWho = record.parties[1]?.name?.trim() || "The other person";
+      }
+
+      const updatedParties = record.parties.map((party, index) => {
+        if (index === 0) {
+          return { ...party, acknowledged: now };
+        }
+        return party;
+      });
+
+      // For second acknowledge, also mark party 1
+      const finalParties = newStatus === "acknowledged" ?
+        record.parties.map((party, index) => index === 1 ? { ...party, acknowledged: now } : party)
+        : updatedParties;
+
       const acknowledged: TruthCapture = {
         ...record,
-        status: "acknowledged",
-        parties: record.parties.map((party) => ({ ...party, acknowledged: now })),
+        status: newStatus,
+        parties: finalParties,
         acknowledgment: {
-          who: record.parties[1]?.name?.trim() || "The other person",
-          when: now,
+          who: ackWho,
+          when: newStatus === "acknowledged" ? now : null,
           method: "code",
         },
       };

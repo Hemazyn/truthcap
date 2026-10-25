@@ -67,7 +67,7 @@ export function TruthCaptureForm({ capture, template, onBack }: TruthCaptureForm
                 <div className="mt-3 grid items-end gap-3 sm:grid-cols-2">
                   <label className="block">
                     <span className="mb-1 block text-xs font-medium text-ink-2">Name</span>
-                    <input type="text" className={partyInputClass} placeholder={index === 0 ? "Your name" : "Their name"} aria-label={`${party.role} name`} value={party.name ?? ""} onChange={(event) => setPartyName(index, event.target.value)} autoComplete={index === 0 ? "name" : "off"} />
+                    <input type="text" className={partyInputClass} placeholder={template.defaultParties[index]?.role ?? index === 0 ? "Your name" : "Their name"} aria-label={`${party.role} name`} value={party.name ?? ""} onChange={(event) => setPartyName(index, event.target.value)} autoComplete={index === 0 ? "name" : "off"} />
                   </label>
 
                   <label className="block">
