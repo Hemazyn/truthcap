@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Copy, RefreshCw } from "lucide-react";
+import { formatDate } from "@/lib/validate";
 import { navigate, routes } from "@/lib/router";
+import { outstandingPartyLabels } from "@/lib/records";
 import { useShareUrl } from "@/lib/useShareUrl";
-import { useTruthStore } from "@/store/useTruthStore";
+import { COUNTERPARTY_PARTY, INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
 import { RecordSummary } from "@/components/RecordSummary";
-// PartyList no longer used directly in this component
+import { PartyList } from "@/components/PartyList";
 import { ShareQr } from "@/components/ShareQr";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
@@ -22,7 +24,11 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
   const code = capture.accessCode ?? "";
   const share = useShareUrl(capture);
   const shareUrl = share.url;
-  const otherParty = capture.parties[1]?.name?.trim() || "the other person";
+  const otherParty = capture.parties[COUNTERPARTY_PARTY]?.name?.trim() || "the other person";
+  const initiatorParty = capture.parties[INITIATOR_PARTY];
+  const initiatorAcknowledged = Boolean(initiatorParty?.acknowledged);
+  const outstanding = outstandingPartyLabels(capture);
+  const leftWith = outstanding.length === 0 ? "" : outstanding.length === 1 ? outstanding[0] + "'s acknowledgment is the last one left." : outstanding.join(" and ") + " still have to acknowledge.";
   const copy = (value: string, kind: "code" | "link") => {
     navigator.clipboard
       .writeText(value)
@@ -63,12 +69,12 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
               <Clock className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-accent-800 uppercase">Waiting for acknowledgment</p>
+              <p className="text-[10.5px] font-semibold tracking-[0.16em] text-accent-800 uppercase">{initiatorAcknowledged ? "Your part is done" : "Waiting for acknowledgment"}</p>
               <h2 className="mt-1 font-display text-2xl leading-tight text-ink sm:text-[1.9rem]">
-                Send {otherParty} the code
+                {initiatorAcknowledged ? `Waiting for ${otherParty} to acknowledge` : `Send ${otherParty} the code`}
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
-                The record stays open until {otherParty} reads it and acknowledges. They see exactly what you wrote — nothing more, nothing hidden.
+                {initiatorAcknowledged ? `You have acknowledged this record, so it is now up to ${otherParty} to read it and acknowledge their copy.` : `The record stays open until ${otherParty} reads it and acknowledges. They see exactly what you wrote — nothing more, nothing hidden.`}
               </p>
             </div>
           </div>
@@ -117,23 +123,21 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            {/* Direct acknowledge CTA if we have an access code */}
-            {code && (
-              <Button
-                onClick={() => navigate(routes.acknowledge(code))}
-                className="w-full sm:w-auto"
-              >
-                Acknowledge this record
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+            {/* The initiator confirms once; after that the record waits on the other party. */}
+            {code && !initiatorAcknowledged && (
+              <>
+                <Button onClick={() => navigate(routes.acknowledge(code))} className="w-full sm:w-auto">
+                  Acknowledge this record
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <p className="w-full text-xs leading-relaxed text-ink-3 sm:max-w-xs">Acknowledge before you send the link, so {otherParty} can see that you have already confirmed.</p>
+              </>
             )}
 
-            {/* Fallback: open acknowledgment page */}
-            {(!code || isAlreadyAcknowledged) && (
-              <Button onClick={() => navigate(routes.acknowledge(code))}>
-                Open acknowledgment page
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+            {code && initiatorAcknowledged && (
+              <p className="w-full rounded-xl bg-brand-50 px-3 py-2.5 text-xs leading-relaxed text-brand-800 ring-1 ring-brand-100">
+                You acknowledged this record{initiatorParty?.acknowledged ? ` on ${formatDate(initiatorParty.acknowledged)}` : ""}. {leftWith}
+              </p>
             )}
 
             {onBack && (
@@ -154,6 +158,13 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
           </div>
         </div>
       )}
+
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-(--shadow-card)">
+        <h3 className="text-xs font-semibold tracking-[0.14em] text-ink-3 uppercase">Who has acknowledged</h3>
+        <div className="mt-3">
+          <PartyList capture={capture} />
+        </div>
+      </div>
 
       <div>
         <h3 className="text-xs font-semibold tracking-[0.14em] text-ink-3 uppercase">What you recorded</h3>

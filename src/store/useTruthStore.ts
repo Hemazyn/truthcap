@@ -8,6 +8,9 @@ type State = {
   activeId: string | null;
 };
 
+/** Which side of the record is acknowledging it. */
+export type Acknowledger = "initiator" | "other";
+
 type Actions = {
   startCapture: (templateId: string) => void;
   setField: (key: string, value: string | number | boolean | null) => void;
@@ -15,7 +18,12 @@ type Actions = {
   setPartyContact: (partyIndex: number, contact: string) => void;
   initiate: () => void;
   reopenDraft: () => void;
-  acknowledge: (recordId: string, code: string) => boolean;
+  /**
+   * Records one party's acknowledgment. The initiator confirms on their own
+   * copy; the person who opened a shared copy confirms as the other party. The
+   * record only becomes acknowledged once every party has confirmed.
+   */
+  acknowledge: (recordId: string, code: string, as?: Acknowledger) => boolean;
   /** Bring a record that arrived through a share link into this browser. */
   importRecord: (capture: TruthCapture) => void;
   openRecord: (recordId: string) => void;
@@ -26,6 +34,11 @@ type Actions = {
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const FALLBACK_INITIATOR = "The initiator";
+const MAX_NAME_LENGTH = 40;
+
+/** Party 0 is the initiator; the person who opens a shared copy is the other party. */
+export const INITIATOR_PARTY = 0;
+export const COUNTERPARTY_PARTY = 1;
 
 function generateId(): string {
   return `trc_${Math.random().toString(36).slice(2, 10)}`;
@@ -37,10 +50,6 @@ function makeCode(): string {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
   }
   return code;
-}
-
-function normalizeName(name: string): string {
-  return name.trim().slice(0, 40);
 }
 
 function buildCapture(template: TruthTemplate): TruthCapture {
@@ -121,7 +130,8 @@ export const useTruthStore = create<State & Actions>((set, get) => {
     setPartyName: (partyIndex, name) => {
       updateActive((capture) => ({
         ...capture,
-        parties: capture.parties.map((party, index) => (index === partyIndex ? { ...party, name: normalizeName(name) } : party)),
+        // Spaces are kept as they are typed; names are trimmed when the record is initiated.
+        parties: capture.parties.map((party, index) => (index === partyIndex ? { ...party, name: name.slice(0, MAX_NAME_LENGTH) } : party)),
       }));
     },
 
@@ -136,12 +146,16 @@ export const useTruthStore = create<State & Actions>((set, get) => {
       updateActive((capture) => {
         if (capture.status !== "draft") return capture;
 
-        const initiator = capture.parties[0]?.name?.trim() || FALLBACK_INITIATOR;
+        // The draft is done being typed, so stray spacing is cleaned up here.
+        const parties = capture.parties.map((party) => ({ ...party, name: party.name?.trim() ?? "", contact: party.contact?.trim() ?? "" }));
+        const initiator = parties[INITIATOR_PARTY]?.name?.trim() || FALLBACK_INITIATOR;
+
         return {
           ...capture,
           status: "pending",
           accessCode: capture.accessCode ?? makeCode(),
           initiator,
+          parties,
         };
       });
     },
@@ -150,50 +164,31 @@ export const useTruthStore = create<State & Actions>((set, get) => {
       updateActive((capture) => (capture.status === "pending" ? { ...capture, status: "draft" } : capture));
     },
 
-    acknowledge: (recordId, code) => {
+    acknowledge: (recordId, code, as = "initiator") => {
       const { records, activeId } = get();
       const record = records.find((candidate) => candidate.id === recordId);
 
-      if (!record || record.status !== "pending" || !record.accessCode) return false;
-      if (record.accessCode.toUpperCase() !== code.trim().toUpperCase()) return false;
+      if (!record || (record.status !== "pending" && record.status !== "acknowledged")) return false;
+      if (!record.accessCode || record.accessCode.toUpperCase() !== code.trim().toUpperCase()) return false;
+
+      const target = as === "other" ? COUNTERPARTY_PARTY : INITIATOR_PARTY;
+      const party = record.parties[target];
+
+      if (!party) return false;
+      // One party acknowledging never stands in for the other, and never twice.
+      if (party.acknowledged) return true;
 
       const now = new Date().toISOString();
-      // Check if initiator (party 0) has already acknowledged
-      const party0Acknowledged = record.parties[0].acknowledged !== undefined;
-
-      // Determine new status and who to acknowledge
-      let newStatus: "pending" | "acknowledged";
-      let ackWho: string;
-
-      if (!party0Acknowledged) {
-        // First acknowledge: mark initiator (party 0)
-        newStatus = "pending";
-        ackWho = record.parties[0]?.name?.trim() || "The initiator";
-      } else {
-        // Second acknowledge: mark other party (party 1)
-        newStatus = "acknowledged";
-        ackWho = record.parties[1]?.name?.trim() || "The other person";
-      }
-
-      const updatedParties = record.parties.map((party, index) => {
-        if (index === 0) {
-          return { ...party, acknowledged: now };
-        }
-        return party;
-      });
-
-      // For second acknowledge, also mark party 1
-      const finalParties = newStatus === "acknowledged" ?
-        record.parties.map((party, index) => index === 1 ? { ...party, acknowledged: now } : party)
-        : updatedParties;
+      const parties = record.parties.map((candidate, index) => (index === target ? { ...candidate, acknowledged: now } : candidate));
+      const complete = parties.every((candidate) => Boolean(candidate.acknowledged));
 
       const acknowledged: TruthCapture = {
         ...record,
-        status: newStatus,
-        parties: finalParties,
+        status: complete ? "acknowledged" : "pending",
+        parties,
         acknowledgment: {
-          who: ackWho,
-          when: newStatus === "acknowledged" ? now : null,
+          who: party.name?.trim() || party.role || "The other person",
+          when: complete ? now : null,
           method: "code",
         },
       };
@@ -212,8 +207,19 @@ export const useTruthStore = create<State & Actions>((set, get) => {
       // Never downgrade a copy that was already acknowledged here.
       if (existing?.status === "acknowledged") return;
 
-      const next = existing ? records.map((record) => (record.id === capture.id ? capture : record)) : [...records, capture];
-      commit(next, activeId);
+      // A shared copy can arrive without the acknowledgments this device already
+      // holds, so a party that acknowledged here keeps that acknowledgment.
+      const next: TruthCapture = existing
+        ? {
+            ...capture,
+            parties: capture.parties.map((party, index) => {
+              const local = existing.parties[index];
+              return !party.acknowledged && local?.acknowledged ? { ...party, acknowledged: local.acknowledged } : party;
+            }),
+          }
+        : capture;
+
+      commit(existing ? records.map((record) => (record.id === capture.id ? next : record)) : [...records, capture], activeId);
     },
 
     openRecord: (recordId) => {

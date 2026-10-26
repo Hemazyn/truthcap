@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { useTruthStore } from "@/store/useTruthStore";
 import { findActiveRecord, templateFor } from "@/lib/records";
@@ -23,8 +23,21 @@ export function TruthCreateStep() {
   const startCapture = useTruthStore((state) => state.startCapture);
   const discardDraft = useTruthStore((state) => state.discardDraft);
   const reopenDraft = useTruthStore((state) => state.reopenDraft);
+  const clearActive = useTruthStore((state) => state.clearActive);
 
-  const capture = findActiveRecord(records, activeId);
+  const activeCapture = findActiveRecord(records, activeId);
+
+  // /create always begins something new: a record that was already waiting for
+  // acknowledgment when this screen opened is dropped (it stays in Records),
+  // while a draft in progress is picked back up. Read once on entry so a record
+  // that turns pending while this screen stays open keeps its share step.
+  const [stalePendingId] = useState(() => (activeCapture?.status === "pending" ? activeCapture.id : null));
+
+  useEffect(() => {
+    if (stalePendingId) clearActive();
+  }, [stalePendingId, clearActive]);
+
+  const capture = stalePendingId && activeCapture?.id === stalePendingId ? null : activeCapture;
   const template = templateFor(capture);
   const step: Step = !capture ? "pick" : capture.status === "draft" ? "fill" : "share";
   const currentIndex = STEP_LABELS.findIndex((item) => item.id === step);

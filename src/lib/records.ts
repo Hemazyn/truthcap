@@ -49,3 +49,16 @@ export function partyLabel(capture: TruthCapture, index: number): string {
   if (!party) return "";
   return party.name?.trim() || party.role;
 }
+
+/** Names of the parties whose acknowledgment is still outstanding, in order. */
+export function outstandingPartyLabels(capture: TruthCapture): string[] {
+  return capture.parties.reduce<string[]>((labels, party, index) => {
+    if (!party.acknowledged) labels.push(partyLabel(capture, index) || `Party ${index + 1}`);
+    return labels;
+  }, []);
+}
+
+/** How many parties have acknowledged, out of the parties on the record. */
+export function acknowledgedPartyCount(capture: TruthCapture): number {
+  return capture.parties.filter((party) => Boolean(party.acknowledged)).length;
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, Check, ClipboardList, FileText, Plus, Search } from "lucide-react";
 import { formatDate } from "@/lib/validate";
-import { partyLabel } from "@/lib/records";
+import { acknowledgedPartyCount, outstandingPartyLabels, partyLabel } from "@/lib/records";
 import { navigate, routes } from "@/lib/router";
 import { useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
@@ -106,7 +106,9 @@ export function RecordsPage() {
       ) : (
         <ul className="mt-6 space-y-3">
           {visible.map((capture) => {
-            const status = STATUS_STYLES[capture.status];
+            const outstanding = outstandingPartyLabels(capture);
+            // A record someone has already confirmed is waiting on a named person, not on nobody.
+            const status = capture.status === "pending" && outstanding.length > 0 && acknowledgedPartyCount(capture) > 0 ? { label: `Waiting for ${outstanding[0]}`, className: STATUS_STYLES.pending.className } : STATUS_STYLES[capture.status];
             const parties = capture.parties.map((_, index) => partyLabel(capture, index)).filter(Boolean);
 
             return (

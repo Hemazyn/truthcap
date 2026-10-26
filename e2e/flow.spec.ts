@@ -5,8 +5,8 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => window.localStorage.clear());
 });
 
-/** Creates a pending item-condition record and returns its share link. */
-async function createPendingRecord(page: Page): Promise<{ title: string; shareUrl: string }> {
+/** Creates a pending item-condition record and returns its share link and code. */
+async function createPendingRecord(page: Page): Promise<{ title: string; shareUrl: string; code: string }> {
   await page.goto("/create");
   await page.getByRole("button", { name: /Item condition agreed/ }).click();
   await page.getByRole("button", { name: "Start this record" }).click();
@@ -21,6 +21,9 @@ async function createPendingRecord(page: Page): Promise<{ title: string; shareUr
   await page.getByRole("button", { name: "Create the record" }).click();
 
   await expect(page.getByRole("heading", { name: "Send Bola the code" })).toBeVisible();
+  const code = (await page.locator("p.font-mono").first().innerText()).trim();
+  expect(code).toMatch(/^[A-Z0-9]{6}$/);
+
   const link = page.locator("code").first();
   await expect(link).toHaveText(/\/s\/[23456789abcdefghijkmnpqrstuvwxyz]{8}$/);
   const shareUrl = (await link.innerText()).trim();
@@ -29,10 +32,68 @@ async function createPendingRecord(page: Page): Promise<{ title: string; shareUr
   expect(shareUrl.length).toBeLessThan(80);
   await expect(page.getByRole("img", { name: "QR code for the share link" })).toBeVisible();
 
-  return { title: "Item condition agreed", shareUrl };
+  return { title: "Item condition agreed", shareUrl, code };
 }
 
-test("creates, shares and acknowledges a record that survives reload", async ({ page }) => {
+test("a /create visit starts a new record instead of resuming a waiting one", async ({ page }) => {
+  await createPendingRecord(page);
+
+  // The record is saved, but going back to create begins something new.
+  await page.goto("/create");
+  await expect(page.getByRole("heading", { name: "What are you capturing?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Send Bola the code" })).toHaveCount(0);
+
+  // A draft in progress is still picked back up.
+  await page.goto("/create");
+  await page.getByRole("button", { name: /Handover acknowledged/ }).click();
+  await page.getByRole("button", { name: "Start this record" }).click();
+  await expect(page.getByRole("heading", { name: "Fill in the details" })).toBeVisible();
+  await page.goto("/records");
+  const draftRow = page.getByRole("listitem").filter({ hasText: "Handover acknowledged" });
+  await expect(draftRow.getByText("Draft", { exact: true })).toBeVisible();
+});
+
+test("a share link stays locked until the acknowledgment code is entered", async ({ page, browser }) => {
+  const { title, shareUrl, code } = await createPendingRecord(page);
+
+  const otherDevice = await browser.newContext();
+  const otherPage = await otherDevice.newPage();
+  await otherPage.goto(shareUrl);
+
+  // The link on its own shows none of the agreement.
+  await expect(otherPage.getByRole("heading", { name: "This agreement is locked" })).toBeVisible();
+  await expect(otherPage.getByRole("heading", { name: title })).toHaveCount(0);
+  await expect(otherPage.getByText("₦420,000")).toHaveCount(0);
+  await expect(otherPage.getByText("MacBook Pro 2019")).toHaveCount(0);
+  await expect(otherPage.getByRole("button", { name: "Enter 6-char code" })).toBeDisabled();
+  await expect(otherPage.getByRole("button", { name: "Acknowledge this copy" })).toHaveCount(0);
+
+  // A wrong code opens nothing and acknowledges nothing.
+  await otherPage.getByLabel("Acknowledgment code").fill("WRONG1");
+  await otherPage.getByRole("button", { name: "Open this agreement" }).click();
+  await expect(otherPage.getByText("That code does not match this record. Check it and try again.")).toBeVisible();
+  await expect(otherPage.getByText("₦420,000")).toHaveCount(0);
+  await expect(otherPage.getByText("Acknowledged by both", { exact: true })).toHaveCount(0);
+
+  // The code the initiator sent is what opens the record.
+  await otherPage.getByLabel("Acknowledgment code").fill(code);
+  await otherPage.getByRole("button", { name: "Open this agreement" }).click();
+  await expect(otherPage.getByRole("heading", { name: title })).toBeVisible();
+  await expect(otherPage.getByText("₦420,000")).toBeVisible();
+  await expect(otherPage.getByText("Waiting for acknowledgment")).toBeVisible();
+
+  // Reading it is not acknowledging it: the code is only entered once.
+  await expect(otherPage.getByLabel("Acknowledgment code")).toHaveCount(0);
+  await otherPage.getByRole("button", { name: "Acknowledge this copy" }).click();
+
+  // This side is acknowledged now, and the screen says whose side is left.
+  await expect(otherPage.getByText("Waiting for Ada", { exact: true })).toBeVisible();
+  await expect(otherPage.getByRole("button", { name: "Acknowledge this copy" })).toHaveCount(0);
+
+  await otherDevice.close();
+});
+
+test("the initiator acknowledges once and the record then waits on the other party", async ({ page }) => {
   await page.goto("/create");
   await expect(page.getByRole("heading", { name: "What are you capturing?" })).toBeVisible();
 
@@ -55,26 +116,36 @@ test("creates, shares and acknowledges a record that survives reload", async ({ 
   const code = (await page.locator("p.font-mono").first().innerText()).trim();
   expect(code).toMatch(/^[A-Z0-9]{6}$/);
 
-  await page.getByRole("button", { name: "Open acknowledgment page" }).click();
+  await page.getByRole("button", { name: "Acknowledge this record" }).click();
   await expect(page.getByRole("heading", { name: "Review before you acknowledge" })).toBeVisible();
   await expect(page.getByLabel("Acknowledgment code")).toHaveValue(code);
 
   await page.getByRole("button", { name: "Acknowledge this record" }).click();
 
-  await expect(page.getByRole("heading", { name: "Item condition agreed" })).toBeVisible();
-  await expect(page.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+  // That side is done, the record is not: it now waits for Bola, and the
+  // acknowledgment form does not come back for the person who already confirmed.
   await expect(page).toHaveURL(/\/record\/trc_/);
+  await expect(page.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
+  await expect(page.getByText(/You acknowledged this record on/)).toBeVisible();
+  await expect(page.getByText(/Bola's acknowledgment is the last one left/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Acknowledge this record" })).toHaveCount(0);
+  await expect(page.getByText("Acknowledged", { exact: true })).toBeVisible();
+  await expect(page.getByText("Pending", { exact: true })).toBeVisible();
   await expect(page.getByText("₦420,000")).toBeVisible();
-
   await expect(page.getByRole("img", { name: "QR code for the share link" })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText("Acknowledged by both", { exact: true })).toBeVisible();
-  await expect(page.getByText("Ada", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
+  await expect(page.getByText("Ada", { exact: true }).first()).toBeVisible();
 
   const stored = await page.evaluate(() => window.localStorage.getItem("truthcap.records.v1"));
   expect(stored).toContain("acknowledged");
   expect(stored).toContain("MacBook Pro 2019");
+
+  await page.getByRole("button", { name: "Records", exact: true }).click();
+  const row = page.getByRole("listitem").filter({ hasText: "Item condition agreed" });
+  await expect(row.getByText("Waiting for Bola", { exact: true })).toBeVisible();
+
   await page.getByRole("button", { name: "Back home" }).click();
   await page.getByRole("button", { name: "Create a record" }).first().click();
   await expect(page.getByRole("heading", { name: "What are you capturing?" })).toBeVisible();
@@ -92,12 +163,12 @@ test("rejects a wrong acknowledgment code", async ({ page }) => {
   await page.getByLabel(/Date of handover/).fill("2026-10-24");
   await page.getByRole("button", { name: "Create the record" }).click();
 
-  await page.getByRole("button", { name: "Open acknowledgment page" }).click();
+  await page.getByRole("button", { name: "Acknowledge this record" }).click();
   await page.getByLabel("Acknowledgment code").fill("WRONG1");
   await page.getByRole("button", { name: "Acknowledge this record" }).click();
 
   await expect(page.getByText("That code does not match this record. Check it and try again.")).toBeVisible();
-  await expect(page.getByText("Acknowledged by both", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Acknowledged", { exact: true })).toHaveCount(0);
 });
 
 test("walks back through the create steps", async ({ page }) => {
@@ -108,6 +179,27 @@ test("walks back through the create steps", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Fill in the details" })).toBeVisible();
   await page.getByRole("button", { name: "Back to templates" }).click();
   await expect(page.getByRole("heading", { name: "What are you capturing?" })).toBeVisible();
+});
+
+test("a party name keeps the spaces typed into it", async ({ page }) => {
+  await page.goto("/create");
+  await page.getByRole("button", { name: /Item condition agreed/ }).click();
+  await page.getByRole("button", { name: "Start this record" }).click();
+
+  const name = page.getByLabel("Person handing over the item name");
+  await name.pressSequentially("Ada Bola ");
+  await expect(name).toHaveValue("Ada Bola ");
+
+  await page.getByLabel("Person receiving the item name").fill("Bola Ade");
+  await page.getByLabel(/Item/).fill("MacBook Pro 2019");
+  await page.getByLabel(/Condition we both agreed it was in/).click();
+  await page.getByRole("option", { name: "Good", exact: true }).click();
+  await page.getByLabel(/Date of handover/).fill("2026-10-22");
+  await page.getByRole("button", { name: "Create the record" }).click();
+
+  // The name the record carries keeps the space and drops the stray one.
+  await expect(page.getByRole("heading", { name: "Send Bola Ade the code" })).toBeVisible();
+  await expect(page.getByText("Ada Bola", { exact: true }).first()).toBeVisible();
 });
 
 test("flags unknown paths as 404", async ({ page }) => {
@@ -154,11 +246,18 @@ test("lists records on /records and opens one", async ({ page }) => {
 });
 
 test("a share link opens the record on another device", async ({ page, browser }) => {
-  const { title, shareUrl } = await createPendingRecord(page);
+  const { title, shareUrl, code } = await createPendingRecord(page);
 
   const otherDevice = await browser.newContext();
   const otherPage = await otherDevice.newPage();
   await otherPage.goto(shareUrl);
+
+  // The link alone is not enough, so it lands on the locked copy.
+  await expect(otherPage.getByRole("heading", { name: "This agreement is locked" })).toBeVisible();
+
+  // The code the initiator sent opens it, and the copy says where it lives.
+  await otherPage.getByLabel("Acknowledgment code").fill(code);
+  await otherPage.getByRole("button", { name: "Open this agreement" }).click();
 
   await expect(otherPage.getByRole("heading", { name: title })).toBeVisible();
   await expect(otherPage.getByText("₦420,000")).toBeVisible();
@@ -166,15 +265,48 @@ test("a share link opens the record on another device", async ({ page, browser }
   await expect(otherPage.getByText(/stays for 90 days/)).toBeVisible();
 
   await otherPage.getByRole("button", { name: "Acknowledge this copy" }).click();
-  await expect(otherPage.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+  await expect(otherPage.getByText("Waiting for Ada", { exact: true })).toBeVisible();
 
   await otherPage.getByRole("button", { name: "All your records" }).click();
   await expect(otherPage.getByRole("heading", { name: "Records on this device" })).toBeVisible();
-  await expect(otherPage.getByRole("listitem").filter({ hasText: title }).getByText("Acknowledged", { exact: true })).toBeVisible();
+  // The acknowledgment is recorded for Bola, the party who opened the copy.
+  const row = otherPage.getByRole("listitem").filter({ hasText: title });
+  await expect(row).toBeVisible();
+  await expect(row.getByText("Waiting for Ada", { exact: true })).toBeVisible();
 
   const stored = await otherPage.evaluate(() => window.localStorage.getItem("truthcap.records.v1"));
   expect(stored).toContain("MacBook Pro 2019");
   expect(stored).toContain("acknowledged");
+
+  await otherDevice.close();
+});
+
+test("an acknowledgment the initiator made travels in the link they send", async ({ page, browser }) => {
+  const { code } = await createPendingRecord(page);
+
+  // The initiator confirms first, so the link they send carries their side.
+  await page.getByRole("button", { name: "Acknowledge this record" }).click();
+  await page.getByRole("button", { name: "Acknowledge this record" }).click();
+  await expect(page.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
+
+  const link = page.locator("code").first();
+  await expect(link).toHaveText(/\/s\//);
+  const freshUrl = (await link.innerText()).trim();
+
+  const otherDevice = await browser.newContext();
+  const otherPage = await otherDevice.newPage();
+  await otherPage.goto(freshUrl);
+
+  await otherPage.getByLabel("Acknowledgment code").fill(code);
+  await otherPage.getByRole("button", { name: "Open this agreement" }).click();
+
+  // This copy knows the initiator has confirmed, and that its own side is left.
+  await expect(otherPage.getByText(/Ada acknowledged this record on/)).toBeVisible();
+  await expect(otherPage.getByText("Waiting for Bola", { exact: true })).toBeVisible();
+
+  await otherPage.getByRole("button", { name: "Acknowledge this copy" }).click();
+  await expect(otherPage.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+  await expect(otherPage.getByText(/Timestamped/)).toBeVisible();
 
   await otherDevice.close();
 });
