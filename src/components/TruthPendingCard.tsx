@@ -4,6 +4,7 @@ import { formatDate } from "@/lib/validate";
 import { navigate, routes } from "@/lib/router";
 import { outstandingPartyLabels } from "@/lib/records";
 import { useShareUrl } from "@/lib/useShareUrl";
+import { useRecordAcks } from "@/lib/useRecordAcks";
 import { COUNTERPARTY_PARTY, INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
 import { RecordSummary } from "@/components/RecordSummary";
@@ -25,6 +26,10 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
   const share = useShareUrl(capture);
   const shareUrl = share.url;
   const otherParty = capture.parties[COUNTERPARTY_PARTY]?.name?.trim() || "the other person";
+  // The other person's confirmation has to reach this screen on its own, so the
+  // card keeps asking while it is open: once they confirm, this flips to done.
+  useRecordAcks(capture.id, { poll: true });
+
   const initiatorParty = capture.parties[INITIATOR_PARTY];
   const initiatorAcknowledged = Boolean(initiatorParty?.acknowledged);
   const outstanding = outstandingPartyLabels(capture);

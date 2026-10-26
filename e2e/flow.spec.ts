@@ -311,6 +311,75 @@ test("an acknowledgment the initiator made travels in the link they send", async
   await otherDevice.close();
 });
 
+test("one device's acknowledgment reaches the other device without a refresh", async ({ browser }) => {
+  test.setTimeout(60_000);
+
+  const firstDevice = await browser.newContext();
+  const first = await firstDevice.newPage();
+  const { code } = await createPendingRecord(first);
+
+  // The initiator confirms first, so their copy waits for Bola.
+  await first.getByRole("button", { name: "Acknowledge this record" }).click();
+  await first.getByRole("button", { name: "Acknowledge this record" }).click();
+  await expect(first.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
+
+  const link = first.locator("code").first();
+  await expect(link).toHaveText(/\/s\//);
+  const shareUrl = (await link.innerText()).trim();
+
+  // Bola's device opens the link, enters the code and confirms it.
+  const secondDevice = await browser.newContext();
+  const second = await secondDevice.newPage();
+  await second.goto(shareUrl);
+  await second.getByLabel("Acknowledgment code").fill(code);
+  await second.getByRole("button", { name: "Open this agreement" }).click();
+  await second.getByRole("button", { name: "Acknowledge this copy" }).click();
+  await expect(second.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+
+  // The first device is told on its own — no reload, no new link to send.
+  await first.bringToFront();
+  await expect(first.getByText("Acknowledged by both", { exact: true }).first()).toBeVisible({ timeout: 25_000 });
+
+  await secondDevice.close();
+  await firstDevice.close();
+});
+
+test("the link, not this browser's history, decides what the shared copy shows", async ({ page }) => {
+  const { title, shareUrl, code } = await createPendingRecord(page);
+
+  // This browser already holds an older copy of the same record, from an
+  // earlier session: same id, marked acknowledged by both people.
+  await page.evaluate(() => {
+    const key = "truthcap.records.v1";
+    const state = JSON.parse(window.localStorage.getItem(key) ?? "{}") as { records: { parties: { acknowledged?: string }[]; [key: string]: unknown }[] };
+    const now = new Date().toISOString();
+
+    for (const record of state.records) {
+      record.status = "acknowledged";
+      record.parties = record.parties.map((party) => ({ ...party, acknowledged: now }));
+    }
+
+    window.localStorage.setItem(key, JSON.stringify(state));
+  });
+
+  // Same profile, fresh tab: the link is still pending, so it still opens locked.
+  const second = await page.context().newPage();
+  await second.goto(shareUrl);
+  await expect(second.getByRole("heading", { name: "This agreement is locked" })).toBeVisible();
+
+  await second.getByLabel("Acknowledgment code").fill(code);
+  await second.getByRole("button", { name: "Open this agreement" }).click();
+
+  // The record itself comes from the link, and this device's own confirmations
+  // are kept instead of being overwritten by the older payload.
+  await expect(second.getByRole("heading", { name: title })).toBeVisible();
+  await expect(second.getByText("₦420,000")).toBeVisible();
+  await expect(second.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Acknowledge this copy" })).toHaveCount(0);
+
+  await second.close();
+});
+
 test("explains a damaged share link", async ({ page }) => {
   await page.goto("/shared#not-a-real-payload");
   await expect(page.getByRole("heading", { name: "This link is incomplete" })).toBeVisible();
