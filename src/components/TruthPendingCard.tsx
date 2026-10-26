@@ -52,13 +52,11 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
       {/* Show acknowledgment status if already done */}
       {isAlreadyAcknowledged && (
         <div className="rounded-2xl border border-brand-100 bg-brand-50/70 p-6 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-brand-100 text-brand-700 mb-4">
+          <span className="mb-4 grid h-12 w-12 place-items-center rounded-full bg-brand-100 text-brand-700">
             <CheckCircle2 className="h-6 w-6" />
           </span>
           <h3 className="text-xl font-semibold text-brand-800">Acknowledged by both</h3>
-          <p className="text-brand-700 text-sm">
-            Both people have acknowledged this record. You can view, copy, or print your copy anytime.
-          </p>
+          <p className="text-sm text-brand-700">Both people have acknowledged this record. You can view, copy, or print your copy anytime.</p>
           <div className="mt-4">
             <Button onClick={() => navigate(routes.record(capture.id))} size="lg">
               Open the record
@@ -75,12 +73,8 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
             </span>
             <div>
               <p className="text-[10.5px] font-semibold tracking-[0.16em] text-accent-800 uppercase">{initiatorAcknowledged ? "Your part is done" : "Waiting for acknowledgment"}</p>
-              <h2 className="mt-1 font-display text-2xl leading-tight text-ink sm:text-[1.9rem]">
-                {initiatorAcknowledged ? `Waiting for ${otherParty} to acknowledge` : `Send ${otherParty} the code`}
-              </h2>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
-                {initiatorAcknowledged ? `You have acknowledged this record, so it is now up to ${otherParty} to read it and acknowledge their copy.` : `The record stays open until ${otherParty} reads it and acknowledges. They see exactly what you wrote — nothing more, nothing hidden.`}
-              </p>
+              <h2 className="mt-1 font-display text-2xl leading-tight text-ink sm:text-[1.9rem]">{initiatorAcknowledged ? `Waiting for ${otherParty} to acknowledge` : `Send ${otherParty} the code`}</h2>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">{initiatorAcknowledged ? `You have acknowledged this record, so it is now up to ${otherParty} to read it and acknowledge their copy.` : `The record stays open until ${otherParty} reads it and acknowledges. They see exactly what you wrote — nothing more, nothing hidden.`}</p>
             </div>
           </div>
 
@@ -102,25 +96,13 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-ink">Share link</p>
                 <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs text-ink-2 ring-1 ring-line">
-                    {shareUrl ?? "Preparing the link…"}
-                  </code>
+                  <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs text-ink-2 ring-1 ring-line">{shareUrl ?? "Preparing the link…"}</code>
                   <Button variant="quiet" size="sm" className="shrink-0" disabled={!shareUrl} onClick={() => shareUrl && copy(shareUrl, "link")}>
                     {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     {copied === "link" ? "Copied" : "Copy link"}
                   </Button>
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-ink-3">
-                  {share.viaServer ? (
-                    "This short link opens on any device and stays available for 90 days — " +
-                      otherParty +
-                      " needs no account. It is kept on TruthCap's storage until then, so anyone with the link can read it."
-                  ) : (
-                    "The record travels inside the link itself, so it opens on any device — even if " +
-                      otherParty +
-                      " has never visited TruthCap. Nothing is stored on a server."
-                  )}
-                </p>
+                <p className="mt-2 text-xs leading-relaxed text-ink-3">{share.viaServer ? "This short link opens on any device and stays available for 90 days — " + otherParty + " needs no account. It is kept on TruthCap's storage until then, so anyone with the link can read it." : "The record travels inside the link itself, so it opens on any device — even if " + otherParty + " has never visited TruthCap. Nothing is stored on a server."}</p>
               </div>
 
               <ShareQr value={shareUrl} size={120} caption={`Let ${otherParty} scan this`} className="self-center sm:self-start" />
