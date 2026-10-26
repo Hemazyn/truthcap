@@ -67,17 +67,25 @@ describe("capture lifecycle", () => {
     const capture = getActive();
     expect(capture?.accessCode).toBeTruthy();
 
-    expect(useTruthStore.getState().acknowledge(capture!.id, "WRONG1")).toBe(false);
+    expect(useTruthStore.getState().acknowledge(capture!.id, "WRONG1", "initiator")).toBe(false);
     expect(getActive()?.status).toBe("pending");
 
-    // First acknowledge: initiator (Ada) acknowledges, status stays pending
-    const firstAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase());
+    // The initiator confirms their side; the record waits on the other party.
+    const firstAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase(), "initiator");
     expect(firstAccepted).toBe(true);
     expect(getActive()?.status).toBe("pending");
+    expect(getActive()?.parties[0].acknowledged).toBeTruthy();
+    expect(getActive()?.parties[1].acknowledged).toBeUndefined();
     expect(getActive()?.acknowledgment?.who).toBe("Ada");
+    expect(getActive()?.acknowledgment?.when).toBeNull();
 
-    // Second acknowledge: other party (Bola) acknowledges, status becomes acknowledged
-    const secondAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase());
+    // The same side confirming again never stands in for the other party.
+    expect(useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!, "initiator")).toBe(true);
+    expect(getActive()?.status).toBe("pending");
+    expect(getActive()?.parties[1].acknowledged).toBeUndefined();
+
+    // The other party confirming the same code completes the record.
+    const secondAccepted = useTruthStore.getState().acknowledge(capture!.id, capture!.accessCode!.toLowerCase(), "other");
     expect(secondAccepted).toBe(true);
 
     const acknowledged = getActive();
@@ -87,20 +95,48 @@ describe("capture lifecycle", () => {
     expect(acknowledged?.parties.every((party) => Boolean(party.acknowledged))).toBe(true);
   });
 
+  it("keeps the spaces typed into a party name and trims them on initiate", () => {
+    const store = useTruthStore.getState();
+    store.startCapture("handover-acknowledged");
+
+    store.setPartyName(0, "Ada Bola ");
+    expect(getActive()?.parties[0].name).toBe("Ada Bola ");
+
+    store.initiate();
+    expect(getActive()?.parties[0].name).toBe("Ada Bola");
+    expect(getActive()?.initiator).toBe("Ada Bola");
+  });
+
+  it("keeps a local acknowledgment when a shared copy arrives without it", () => {
+    const store = useTruthStore.getState();
+    store.startCapture("handover-acknowledged");
+    store.initiate();
+
+    const capture = getActive()!;
+    store.acknowledge(capture.id, capture.accessCode!, "initiator");
+    expect(getActive()?.parties[0].acknowledged).toBeTruthy();
+
+    // A link made before that acknowledgment carries none of it.
+    const stale = { ...capture, parties: capture.parties.map((party) => ({ ...party, acknowledged: undefined })) };
+    store.importRecord(stale);
+
+    const stored = useTruthStore.getState().records.find((record) => record.id === capture.id);
+    expect(stored?.parties[0].acknowledged).toBeTruthy();
+    expect(stored?.parties[1].acknowledged).toBeUndefined();
+  });
+
   it("discards a draft but keeps acknowledged records", () => {
     const store = useTruthStore.getState();
     store.startCapture("handover-acknowledged");
     store.initiate();
 
     const firstId = getActive()!.id;
-    // First acknowledge: initiator acknowledges
-    store.acknowledge(firstId, getActive()!.accessCode!);
+    // The initiator acknowledges, then the other party acknowledges the same code.
+    store.acknowledge(firstId, getActive()!.accessCode!, "initiator");
 
-    // Second acknowledge: other party acknowledges (simulating the other person acknowledging)
-    // We need to get the record again since state changed
     const record = useTruthStore.getState().records.find((r) => r.id === firstId);
     if (record && record.status === "pending" && record.accessCode) {
-      store.acknowledge(record.id, record.accessCode);
+      store.acknowledge(record.id, record.accessCode, "other");
     }
 
     store.startCapture("repair-agreed");
