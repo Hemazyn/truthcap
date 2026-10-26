@@ -12,14 +12,6 @@ interface UseRecordAcksOptions {
   enabled?: boolean;
 }
 
-/**
- * Keeps one record's acknowledgment state in step with the other device: pulls
- * when the record opens, and — when asked — quietly re-checks every ten seconds
- * so the other person's confirmation shows up without a reload. It stops asking
- * as soon as everyone has confirmed, skips hidden tabs, and only ever reads for
- * a record this device holds, so it cannot spend the store's quota on records
- * that are not on screen.
- */
 export function useRecordAcks(recordId: string | null, { poll = false, enabled = true }: UseRecordAcksOptions = {}): void {
   useEffect(() => {
     if (!recordId || !enabled) return;

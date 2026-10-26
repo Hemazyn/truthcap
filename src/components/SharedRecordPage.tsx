@@ -146,9 +146,7 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
           </div>
 
           <form onSubmit={handleUnlock} className="px-5 py-6 sm:px-7">
-            <p className="text-sm leading-relaxed text-ink-2">
-              {initiator} sent you a copy of this record, and the code that opens it comes separately. Enter the six-character acknowledgment code they shared with you to read what you both agreed.
-            </p>
+            <p className="text-sm leading-relaxed text-ink-2">{initiator} sent you a copy of this record, and the code that opens it comes separately. Enter the six-character acknowledgment code they shared with you to read what you both agreed.</p>
 
             <label htmlFor="shared-ack-code" className="mt-5 block text-sm font-medium text-ink">
               Acknowledgment code
@@ -277,9 +275,7 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
             </p>
           )}
 
-          <p className="w-full text-xs leading-relaxed text-ink-3 sm:ml-auto sm:w-auto sm:max-w-xs sm:text-right">
-            {canAcknowledge ? "You entered the code the initiator sent, so acknowledging timestamps this copy on your device. The initiator's copy stays as it is until records sync between accounts." : "Nothing here is editable. Whatever you read is exactly what was sent."}
-          </p>
+          <p className="w-full text-xs leading-relaxed text-ink-3 sm:ml-auto sm:w-auto sm:max-w-xs sm:text-right">{canAcknowledge ? "You entered the code the initiator sent, so acknowledging timestamps this copy on your device. The initiator's copy stays as it is until records sync between accounts." : "Nothing here is editable. Whatever you read is exactly what was sent."}</p>
         </div>
       </div>
     </div>

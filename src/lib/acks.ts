@@ -1,17 +1,5 @@
 import type { TruthCapture } from "@/types/truth";
 
-/**
- * The acknowledgment channel between the two devices that hold a record.
- *
- * Both sides decode the record id out of the payload, so acknowledgments are
- * keyed by it: the channel works whether the record arrived as a short link or
- * inside a `#…` link, and the store never has to understand the record format.
- * It keeps a party index, a timestamp, and the code that gates the record.
- *
- * Without the store configured (or reachable) every call simply reports failure
- * and acknowledgment state stays on each device, which is how it worked before.
- */
-
 const REQUEST_TIMEOUT_MS = 4000;
 const RECORD_PATTERN = /^trc_[A-Za-z0-9\-_]{1,64}$/;
 
