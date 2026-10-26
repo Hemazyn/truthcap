@@ -50,6 +50,35 @@ export function partyLabel(capture: TruthCapture, index: number): string {
   return party.name?.trim() || party.role;
 }
 
+/**
+ * A copy that arrived over a share link, merged with the one this device already
+ * holds. The link carries what the other side sent; this device keeps its own
+ * acknowledgment stamps, so an older payload can never roll them back and a
+ * stale local copy can never hide what the link says either.
+ */
+export function mergeSharedCopy(existing: TruthCapture | null, incoming: TruthCapture): TruthCapture {
+  if (!existing) return incoming;
+
+  const parties = incoming.parties.map((party, index) => {
+    const local = existing.parties[index];
+    return !party.acknowledged && local?.acknowledged ? { ...party, acknowledged: local.acknowledged } : party;
+  });
+  const complete = parties.length > 0 && parties.every((party) => Boolean(party.acknowledged));
+
+  // Whoever recorded the moment both sides confirmed keeps the timestamp; a link
+  // made before that carries an acknowledgment with no `when` and loses here.
+  const localAcknowledgment = existing.acknowledgment ?? null;
+  const incomingAcknowledgment = incoming.acknowledgment ?? null;
+  const acknowledgment = localAcknowledgment?.when && !incomingAcknowledgment?.when ? localAcknowledgment : (incomingAcknowledgment ?? localAcknowledgment);
+
+  return {
+    ...incoming,
+    parties,
+    acknowledgment,
+    status: incoming.status === "pending" && complete ? "acknowledged" : incoming.status,
+  };
+}
+
 /** Names of the parties whose acknowledgment is still outstanding, in order. */
 export function outstandingPartyLabels(capture: TruthCapture): string[] {
   return capture.parties.reduce<string[]>((labels, party, index) => {

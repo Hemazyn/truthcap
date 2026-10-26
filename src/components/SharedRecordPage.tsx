@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { CheckCircle2, Clock, Link2, Lock, Printer, ShieldCheck } from "lucide-react";
 import { formatDate } from "@/lib/validate";
 import { canDecodeCompressedLinks, decodeRecord } from "@/lib/share";
-import { acknowledgedPartyCount, outstandingPartyLabels, templateFor } from "@/lib/records";
+import { acknowledgedPartyCount, mergeSharedCopy, outstandingPartyLabels, templateFor } from "@/lib/records";
 import { printRecord } from "@/lib/print";
 import { navigate, routes } from "@/lib/router";
 import { COUNTERPARTY_PARTY, INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
@@ -70,9 +70,10 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
     );
   }
 
-  // This browser may hold a fuller copy than the link (its own acknowledgment, or
-  // one the initiator sent), so the store's copy wins when there is one.
-  const current = records.find((record) => record.id === capture.id) ?? capture;
+  // This browser may already hold a copy of this record, so what is shown is the
+  // link merged with it: the link decides the content, and this device's own
+  // acknowledgment stamps are kept on top instead of being overwritten either way.
+  const current = mergeSharedCopy(records.find((record) => record.id === capture.id) ?? null, capture);
 
   const codeReady = enteredCode.trim().length === 6;
   const initiator = current.parties[INITIATOR_PARTY]?.name?.trim() || current.initiator || "The other person";
@@ -84,8 +85,10 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
   const canAcknowledge = current.status === "pending" && Boolean(current.accessCode) && !youAcknowledged;
 
   // The record stays hidden until the code is typed in, so a forwarded link or a
-  // scanned QR code on its own opens nothing: the code travels separately.
-  const locked = Boolean(current.accessCode) && current.status === "pending" && !youAcknowledged && unlockedPayload !== data;
+  // scanned QR code on its own opens nothing: the code travels separately. The
+  // link, not this browser's history, decides whether it opens locked — the same
+  // link opens the same way in every browser.
+  const locked = Boolean(capture.accessCode) && capture.status === "pending" && unlockedPayload !== data;
 
   // The link only carries the record — the code arrives separately from the
   // initiator, so nothing here can be acknowledged without typing it in.

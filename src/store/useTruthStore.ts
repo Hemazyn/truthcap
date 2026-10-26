@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getTemplate } from "@/data/templates";
+import { mergeSharedCopy } from "@/lib/records";
 import { STORAGE_KEY, loadState, saveState } from "@/lib/storage";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
@@ -202,24 +203,14 @@ export const useTruthStore = create<State & Actions>((set, get) => {
 
     importRecord: (capture) => {
       const { records, activeId } = get();
-      const existing = records.find((record) => record.id === capture.id);
+      const existing = records.find((record) => record.id === capture.id) ?? null;
 
       // Never downgrade a copy that was already acknowledged here.
       if (existing?.status === "acknowledged") return;
 
-      // A shared copy can arrive without the acknowledgments this device already
-      // holds, so a party that acknowledged here keeps that acknowledgment.
-      const next: TruthCapture = existing
-        ? {
-            ...capture,
-            parties: capture.parties.map((party, index) => {
-              const local = existing.parties[index];
-              return !party.acknowledged && local?.acknowledged ? { ...party, acknowledged: local.acknowledged } : party;
-            }),
-          }
-        : capture;
-
-      commit(existing ? records.map((record) => (record.id === capture.id ? next : record)) : [...records, capture], activeId);
+      // The link's copy, merged with whatever this device already confirmed.
+      const next = mergeSharedCopy(existing, capture);
+      commit(existing ? records.map((record) => (record.id === capture.id ? next : record)) : [...records, next], activeId);
     },
 
     openRecord: (recordId) => {

@@ -311,6 +311,42 @@ test("an acknowledgment the initiator made travels in the link they send", async
   await otherDevice.close();
 });
 
+test("the link, not this browser's history, decides what the shared copy shows", async ({ page }) => {
+  const { title, shareUrl, code } = await createPendingRecord(page);
+
+  // This browser already holds an older copy of the same record, from an
+  // earlier session: same id, marked acknowledged by both people.
+  await page.evaluate(() => {
+    const key = "truthcap.records.v1";
+    const state = JSON.parse(window.localStorage.getItem(key) ?? "{}") as { records: { parties: { acknowledged?: string }[]; [key: string]: unknown }[] };
+    const now = new Date().toISOString();
+
+    for (const record of state.records) {
+      record.status = "acknowledged";
+      record.parties = record.parties.map((party) => ({ ...party, acknowledged: now }));
+    }
+
+    window.localStorage.setItem(key, JSON.stringify(state));
+  });
+
+  // Same profile, fresh tab: the link is still pending, so it still opens locked.
+  const second = await page.context().newPage();
+  await second.goto(shareUrl);
+  await expect(second.getByRole("heading", { name: "This agreement is locked" })).toBeVisible();
+
+  await second.getByLabel("Acknowledgment code").fill(code);
+  await second.getByRole("button", { name: "Open this agreement" }).click();
+
+  // The record itself comes from the link, and this device's own confirmations
+  // are kept instead of being overwritten by the older payload.
+  await expect(second.getByRole("heading", { name: title })).toBeVisible();
+  await expect(second.getByText("₦420,000")).toBeVisible();
+  await expect(second.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+  await expect(second.getByRole("button", { name: "Acknowledge this copy" })).toHaveCount(0);
+
+  await second.close();
+});
+
 test("explains a damaged share link", async ({ page }) => {
   await page.goto("/shared#not-a-real-payload");
   await expect(page.getByRole("heading", { name: "This link is incomplete" })).toBeVisible();

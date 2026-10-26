@@ -70,7 +70,20 @@ function isSameOrigin(request: Request): boolean {
   }
 }
 
-export default async function handler(request: Request): Promise<Response> {
+/**
+ * Vercel runs files under /api as web handlers: the default export is an object
+ * with a `fetch` method that receives a standard Request and returns a Response.
+ * Exporting a bare function made the runtime call it as the classic `(req, res)`
+ * pair, so `new URL(request.url)` threw on the relative path and every call came
+ * back as 500 FUNCTION_INVOCATION_FAILED — the app then fell back to long links.
+ */
+export default {
+  async fetch(request: Request): Promise<Response> {
+    return route(request);
+  },
+};
+
+async function route(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === "GET") {
