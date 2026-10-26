@@ -138,7 +138,7 @@ UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-`api/share.ts` talks to Upstash over its HTTP REST API, so there is no client library or connection pool. Without these variables the endpoint answers `503` and sharing falls back to the long self-contained links.
+Vercel serves `/api/share` from `api/share.ts`, which forwards to the shared handler in `src/app/api/share/route.ts`. That handler talks to Upstash over its HTTP REST API, so there is no client library or connection pool. Without these variables the endpoint answers `503` and sharing falls back to the long self-contained links; acknowledgment syncing also requires this store.
 
 Known gap: `POST /api/share` validates size and rejects cross-origin writes, but is not rate limited. Anyone can create links until the Redis quota runs out; add Upstash's rate limiter before opening it to the public.
 
