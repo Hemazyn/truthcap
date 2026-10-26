@@ -11,13 +11,37 @@ function configureStore(): Command[] {
   process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
 
   const calls: Command[] = [];
+  const values = new Map<string, string>([["share:abcd2345", VALID_PAYLOAD]]);
+  const hashes = new Map<string, Map<string, string>>();
+
+  const reply = (result: unknown) => new Response(JSON.stringify({ result }), { status: 200 });
 
   vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
     const command = JSON.parse(String(init.body)) as Command;
     calls.push(command);
 
-    if (command[0] === "SET") return new Response(JSON.stringify({ result: "OK" }), { status: 200 });
-    if (command[0] === "GET") return new Response(JSON.stringify({ result: command[1] === "share:abcd2345" ? VALID_PAYLOAD : null }), { status: 200 });
+    const [name, ...args] = command;
+    const key = String(args[0]);
+
+    if (name === "SET") {
+      const [setKey, value, ...options] = args as string[];
+      if (options.includes("NX") && values.has(setKey)) return reply(null);
+      values.set(setKey, value);
+      return reply("OK");
+    }
+
+    if (name === "GET") return reply(values.get(key) ?? null);
+
+    if (name === "HSET") {
+      const [, field, value] = args as [string, string, string];
+      const hash = hashes.get(key) ?? new Map<string, string>();
+      hash.set(field, value);
+      hashes.set(key, hash);
+      return reply(1);
+    }
+
+    if (name === "HGETALL") return reply(Object.fromEntries(hashes.get(key) ?? new Map<string, string>()));
+    if (name === "EXPIRE") return reply(1);
 
     return new Response(JSON.stringify({ error: "unexpected" }), { status: 500 });
   });
@@ -119,6 +143,60 @@ describe("GET /api/share", () => {
 
   it("answers 503 when the store is not configured", async () => {
     expect((await handler.fetch(new Request(`${ORIGIN}/api/share?id=abcd2345`))).status).toBe(503);
+  });
+});
+
+describe("the acknowledgment channel", () => {
+  const RECORD = "trc_abc123xyz";
+  const WHEN = "2026-10-26T10:00:00.000Z";
+
+  it("records one side and reads it back for the other", async () => {
+    const calls = configureStore();
+
+    const written = await handler.fetch(post({ record: RECORD, party: 0, when: WHEN, code: "ABC123" }));
+    expect(written.status).toBe(200);
+    // The record's code is pinned beside the record on the first write.
+    expect(calls).toContainEqual(["SET", `code:${RECORD}`, "ABC123", "EX", 7776000]);
+    expect(calls).toContainEqual(["HSET", `ack:${RECORD}`, "0", WHEN]);
+
+    const response = await handler.fetch(new Request(`${ORIGIN}/api/share?record=${RECORD}`));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ acks: [{ party: 0, when: WHEN }] });
+  });
+
+  it("reads an empty list for a record nobody has confirmed", async () => {
+    configureStore();
+
+    const response = await handler.fetch(new Request(`${ORIGIN}/api/share?record=${RECORD}`));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ acks: [] });
+  });
+
+  it("refuses a write carrying someone else's code", async () => {
+    configureStore();
+
+    await handler.fetch(post({ record: RECORD, party: 0, when: WHEN, code: "ABC123" }));
+    const refused = await handler.fetch(post({ record: RECORD, party: 1, when: WHEN, code: "WRONG1" }));
+
+    expect(refused.status).toBe(403);
+  });
+
+  it("rejects records, parties, times and codes it would never accept", async () => {
+    configureStore();
+
+    expect((await handler.fetch(post({ record: "../../etc/passwd", party: 0, when: WHEN, code: "ABC123" }))).status).toBe(400);
+    expect((await handler.fetch(post({ record: RECORD, party: 12, when: WHEN, code: "ABC123" }))).status).toBe(400);
+    expect((await handler.fetch(post({ record: RECORD, party: 1.5, when: WHEN, code: "ABC123" }))).status).toBe(400);
+    expect((await handler.fetch(post({ record: RECORD, party: 0, when: "sometime", code: "ABC123" }))).status).toBe(400);
+    expect((await handler.fetch(post({ record: RECORD, party: 0, when: WHEN, code: "short" }))).status).toBe(400);
+  });
+
+  it("answers 503 when the store is not configured", async () => {
+    expect((await handler.fetch(new Request(`${ORIGIN}/api/share?record=${RECORD}`))).status).toBe(503);
+    expect((await handler.fetch(post({ record: RECORD, party: 0, when: WHEN, code: "ABC123" }))).status).toBe(503);
   });
 });
 

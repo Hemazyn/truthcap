@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Check, ClipboardList, FileText, Plus, Search } from "lucide-react";
 import { formatDate } from "@/lib/validate";
+import { fetchAcks } from "@/lib/acks";
 import { acknowledgedPartyCount, outstandingPartyLabels, partyLabel } from "@/lib/records";
 import { navigate, routes } from "@/lib/router";
 import { useTruthStore } from "@/store/useTruthStore";
@@ -37,9 +38,23 @@ function matchesQuery(capture: TruthCapture, query: string): boolean {
 export function RecordsPage() {
   const records = useTruthStore((state) => state.records);
   const openRecord = useTruthStore((state) => state.openRecord);
+  const applyAcks = useTruthStore((state) => state.applyAcks);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+
+  // A row should not read "Waiting for Bola" after Bola has already confirmed,
+  // so the records still waiting on someone refresh once each time this opens.
+  useEffect(() => {
+    const pending = records.filter((record) => record.status === "pending" && acknowledgedPartyCount(record) < record.parties.length);
+
+    void Promise.all(
+      pending.map(async (record) => {
+        const acks = await fetchAcks(record.id);
+        if (acks) applyAcks(record.id, acks);
+      }),
+    );
+  }, [records, applyAcks]);
 
   const sorted = useMemo(() => [...records].sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [records]);
 

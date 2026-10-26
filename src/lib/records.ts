@@ -51,6 +51,32 @@ export function partyLabel(capture: TruthCapture, index: number): string {
 }
 
 /**
+ * Puts a new set of parties on a record and recomputes what follows from them:
+ * the record is acknowledged once every party has confirmed, and the completion
+ * stamp is the last confirmation that got it there.
+ */
+export function withParties(capture: TruthCapture, parties: TruthCapture["parties"]): TruthCapture {
+  const stamps = parties.map((party) => party.acknowledged).filter((stamp): stamp is string => Boolean(stamp));
+  const latest = stamps.slice().sort().at(-1);
+
+  if (stamps.length === 0) return { ...capture, parties };
+
+  const last = parties.find((party) => party.acknowledged === latest);
+  const complete = stamps.length === parties.length;
+
+  return {
+    ...capture,
+    parties,
+    status: capture.status === "pending" && complete ? "acknowledged" : capture.status,
+    acknowledgment: {
+      who: last?.name?.trim() || last?.role || "The other person",
+      when: complete ? (latest ?? null) : null,
+      method: capture.acknowledgment?.method ?? "code",
+    },
+  };
+}
+
+/**
  * A copy that arrived over a share link, merged with the one this device already
  * holds. The link carries what the other side sent; this device keeps its own
  * acknowledgment stamps, so an older payload can never roll them back and a
@@ -63,20 +89,8 @@ export function mergeSharedCopy(existing: TruthCapture | null, incoming: TruthCa
     const local = existing.parties[index];
     return !party.acknowledged && local?.acknowledged ? { ...party, acknowledged: local.acknowledged } : party;
   });
-  const complete = parties.length > 0 && parties.every((party) => Boolean(party.acknowledged));
 
-  // Whoever recorded the moment both sides confirmed keeps the timestamp; a link
-  // made before that carries an acknowledgment with no `when` and loses here.
-  const localAcknowledgment = existing.acknowledgment ?? null;
-  const incomingAcknowledgment = incoming.acknowledgment ?? null;
-  const acknowledgment = localAcknowledgment?.when && !incomingAcknowledgment?.when ? localAcknowledgment : (incomingAcknowledgment ?? localAcknowledgment);
-
-  return {
-    ...incoming,
-    parties,
-    acknowledgment,
-    status: incoming.status === "pending" && complete ? "acknowledged" : incoming.status,
-  };
+  return withParties(incoming, parties);
 }
 
 /** Names of the parties whose acknowledgment is still outstanding, in order. */

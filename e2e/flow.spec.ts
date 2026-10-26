@@ -311,6 +311,39 @@ test("an acknowledgment the initiator made travels in the link they send", async
   await otherDevice.close();
 });
 
+test("one device's acknowledgment reaches the other device without a refresh", async ({ browser }) => {
+  test.setTimeout(60_000);
+
+  const firstDevice = await browser.newContext();
+  const first = await firstDevice.newPage();
+  const { code } = await createPendingRecord(first);
+
+  // The initiator confirms first, so their copy waits for Bola.
+  await first.getByRole("button", { name: "Acknowledge this record" }).click();
+  await first.getByRole("button", { name: "Acknowledge this record" }).click();
+  await expect(first.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
+
+  const link = first.locator("code").first();
+  await expect(link).toHaveText(/\/s\//);
+  const shareUrl = (await link.innerText()).trim();
+
+  // Bola's device opens the link, enters the code and confirms it.
+  const secondDevice = await browser.newContext();
+  const second = await secondDevice.newPage();
+  await second.goto(shareUrl);
+  await second.getByLabel("Acknowledgment code").fill(code);
+  await second.getByRole("button", { name: "Open this agreement" }).click();
+  await second.getByRole("button", { name: "Acknowledge this copy" }).click();
+  await expect(second.getByText("Acknowledged by both", { exact: true })).toBeVisible();
+
+  // The first device is told on its own — no reload, no new link to send.
+  await first.bringToFront();
+  await expect(first.getByText("Acknowledged by both", { exact: true }).first()).toBeVisible({ timeout: 25_000 });
+
+  await secondDevice.close();
+  await firstDevice.close();
+});
+
 test("the link, not this browser's history, decides what the shared copy shows", async ({ page }) => {
   const { title, shareUrl, code } = await createPendingRecord(page);
 

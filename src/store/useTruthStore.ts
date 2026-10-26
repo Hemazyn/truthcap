@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { getTemplate } from "@/data/templates";
-import { mergeSharedCopy } from "@/lib/records";
+import type { RemoteAck } from "@/lib/acks";
+import { pushAck } from "@/lib/acks";
+import { mergeSharedCopy, withParties } from "@/lib/records";
 import { STORAGE_KEY, loadState, saveState } from "@/lib/storage";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
@@ -25,6 +27,8 @@ type Actions = {
    * record only becomes acknowledged once every party has confirmed.
    */
   acknowledge: (recordId: string, code: string, as?: Acknowledger) => boolean;
+  /** Merge acknowledgments the other device recorded for this record. */
+  applyAcks: (recordId: string, acks: RemoteAck[]) => void;
   /** Bring a record that arrived through a share link into this browser. */
   importRecord: (capture: TruthCapture) => void;
   openRecord: (recordId: string) => void;
@@ -181,24 +185,41 @@ export const useTruthStore = create<State & Actions>((set, get) => {
 
       const now = new Date().toISOString();
       const parties = record.parties.map((candidate, index) => (index === target ? { ...candidate, acknowledged: now } : candidate));
-      const complete = parties.every((candidate) => Boolean(candidate.acknowledged));
-
-      const acknowledged: TruthCapture = {
-        ...record,
-        status: complete ? "acknowledged" : "pending",
-        parties,
-        acknowledgment: {
-          who: party.name?.trim() || party.role || "The other person",
-          when: complete ? now : null,
-          method: "code",
-        },
-      };
+      const acknowledged = withParties(record, parties);
 
       commit(
         records.map((candidate) => (candidate.id === recordId ? acknowledged : candidate)),
         activeId,
       );
+
+      // The other device only learns about this from the shared store, so the
+      // confirmation leaves right away. If the store is unreachable the record
+      // still stands here, and the next pull or retry catches up.
+      void pushAck(acknowledged, target);
       return true;
+    },
+
+    applyAcks: (recordId, acks) => {
+      const { records, activeId } = get();
+      const record = records.find((candidate) => candidate.id === recordId);
+
+      if (!record || acks.length === 0) return;
+
+      const parties = record.parties.map((party, index) => {
+        // A stamp this device already holds is never rewritten.
+        if (party.acknowledged) return party;
+
+        const remote = acks.find((ack) => ack.party === index && Number.isFinite(Date.parse(ack.when)));
+        return remote ? { ...party, acknowledged: new Date(remote.when).toISOString() } : party;
+      });
+
+      // Nothing new: leave the array alone so screens reading it stay put.
+      if (parties.every((party, index) => party === record.parties[index])) return;
+
+      commit(
+        records.map((candidate) => (candidate.id === recordId ? withParties(record, parties) : candidate)),
+        activeId,
+      );
     },
 
     importRecord: (capture) => {

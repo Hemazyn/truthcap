@@ -6,6 +6,7 @@ import { canDecodeCompressedLinks, decodeRecord } from "@/lib/share";
 import { acknowledgedPartyCount, mergeSharedCopy, outstandingPartyLabels, templateFor } from "@/lib/records";
 import { printRecord } from "@/lib/print";
 import { navigate, routes } from "@/lib/router";
+import { useRecordAcks } from "@/lib/useRecordAcks";
 import { COUNTERPARTY_PARTY, INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
 import { RecordNotFound } from "@/components/RecordNotFound";
@@ -44,6 +45,12 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
 
   // A new payload decodes into a new result, so the stale one never renders.
   const decoded = resolved?.data === data ? resolved : null;
+  const unlocked = unlockedPayload === data;
+
+  // Once the copy is open it joins this device's records, which is what lets the
+  // other person's acknowledgment reach this screen: the channel only ever reads
+  // for records this device holds, and stays quiet while the link is locked.
+  useRecordAcks(decoded?.capture?.id ?? null, { enabled: unlocked && Boolean(decoded?.capture), poll: unlocked });
 
   if (!decoded) {
     return (
@@ -88,7 +95,7 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
   // scanned QR code on its own opens nothing: the code travels separately. The
   // link, not this browser's history, decides whether it opens locked — the same
   // link opens the same way in every browser.
-  const locked = Boolean(capture.accessCode) && capture.status === "pending" && unlockedPayload !== data;
+  const locked = Boolean(capture.accessCode) && capture.status === "pending" && !unlocked;
 
   // The link only carries the record — the code arrives separately from the
   // initiator, so nothing here can be acknowledged without typing it in.
@@ -105,6 +112,10 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
 
     setCodeError(null);
     setUnlockedPayload(data);
+
+    // The copy becomes this device's record now that it has been opened with the
+    // code, which is also what the acknowledgment channel keys off.
+    importRecord(capture);
   };
 
   const handleAcknowledge = () => {

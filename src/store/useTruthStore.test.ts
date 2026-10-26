@@ -95,6 +95,53 @@ describe("capture lifecycle", () => {
     expect(acknowledged?.parties.every((party) => Boolean(party.acknowledged))).toBe(true);
   });
 
+  it("merges acknowledgments the other device recorded", () => {
+    const store = useTruthStore.getState();
+    store.startCapture("handover-acknowledged");
+    store.setPartyName(0, "Ada");
+    store.setPartyName(1, "Bola");
+    store.initiate();
+
+    const capture = getActive()!;
+    store.acknowledge(capture.id, capture.accessCode!, "initiator");
+    expect(getActive()?.status).toBe("pending");
+    const firstStamp = getActive()?.parties[0].acknowledged;
+
+    // Bola's device confirmed the same code a moment later.
+    const when = new Date(Date.now() + 60_000).toISOString();
+    useTruthStore.getState().applyAcks(capture.id, [{ party: 1, when }]);
+
+    const synced = useTruthStore.getState().records.find((record) => record.id === capture.id)!;
+    expect(synced.parties[0].acknowledged).toBe(firstStamp);
+    expect(synced.parties[1].acknowledged).toBe(when);
+    expect(synced.status).toBe("acknowledged");
+    expect(synced.acknowledgment?.when).toBe(when);
+    expect(synced.acknowledgment?.who).toBe("Bola");
+
+    // Applying the same entries again changes nothing.
+    const before = useTruthStore.getState().records;
+    useTruthStore.getState().applyAcks(capture.id, [{ party: 1, when }]);
+    expect(useTruthStore.getState().records).toBe(before);
+  });
+
+  it("ignores remote entries for parties this device already confirmed", () => {
+    const store = useTruthStore.getState();
+    store.startCapture("handover-acknowledged");
+    store.initiate();
+
+    const capture = getActive()!;
+    store.acknowledge(capture.id, capture.accessCode!, "initiator");
+    const mine = getActive()!.parties[0].acknowledged;
+
+    const theirs = new Date(Date.now() + 60_000).toISOString();
+    useTruthStore.getState().applyAcks(capture.id, [{ party: 0, when: theirs }, { party: 9, when: theirs }]);
+
+    const after = useTruthStore.getState().records.find((record) => record.id === capture.id)!;
+    expect(after.parties[0].acknowledged).toBe(mine);
+    expect(after.parties[1].acknowledged).toBeUndefined();
+    expect(after.status).toBe("pending");
+  });
+
   it("keeps the spaces typed into a party name and trims them on initiate", () => {
     const store = useTruthStore.getState();
     store.startCapture("handover-acknowledged");
