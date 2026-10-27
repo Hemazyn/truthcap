@@ -1,8 +1,11 @@
+"use client";
+
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
 import { formatDate } from "@/lib/validate";
-import { navigate, routes } from "@/lib/router";
+import { routes } from "@/lib/router";
 import { acknowledgedPartyCount, findRecordByCode, outstandingPartyLabels, templateFor } from "@/lib/records";
 import { INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
@@ -11,6 +14,7 @@ import { RecordSummary } from "@/components/RecordSummary";
 import { PartyList } from "@/components/PartyList";
 
 export function TruthAcknowledgePage({ code }: { code: string }) {
+  const router = useRouter();
   const records = useTruthStore((state) => state.records);
   const acknowledge = useTruthStore((state) => state.acknowledge);
 
@@ -51,7 +55,7 @@ export function TruthAcknowledgePage({ code }: { code: string }) {
       return;
     }
 
-    navigate(routes.record(capture.id));
+    router.push(routes.record(capture.id));
   };
 
   return (
@@ -89,7 +93,7 @@ export function TruthAcknowledgePage({ code }: { code: string }) {
                 Acknowledged {formatDate(accountAcknowledged)}. {everyoneAcknowledged ? "Both sides hold the same copy." : outstanding.length === 1 ? `${outstanding[0]}'s acknowledgment is the last one left.` : `${outstanding.join(" and ")} still have to acknowledge.`}
               </p>
 
-              <Button size="lg" className="mt-4 w-full" onClick={() => navigate(routes.record(capture.id))}>
+              <Button size="lg" className="mt-4 w-full" onClick={() => router.push(routes.record(capture.id))}>
                 Open the record
               </Button>
             </>

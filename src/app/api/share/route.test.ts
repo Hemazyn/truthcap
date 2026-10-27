@@ -1,14 +1,18 @@
 /// <reference types="node" />
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { route } from "./route";
+import { GET, POST } from "./route";
+
+// The tests go through the same exported methods Vercel calls, so a handler that
+// stops being a Web handler fails here instead of only in production.
+const route = (request: Request) => (request.method === "POST" ? POST(request) : GET(request));
 
 const ORIGIN = "https://truthcap.app";
 const VALID_PAYLOAD = "zVcvBCgFBGMBxFin2oJQDl";
 
 type Command = (string | number)[];
 
-function configureStore(): Command[] {
+function configureStore(hgetall: "map" | "flat" = "map"): Command[] {
   process.env.UPSTASH_REDIS_REST_URL = "https://redis.example.com/";
   process.env.UPSTASH_REDIS_REST_TOKEN = "test-token";
 
@@ -42,7 +46,11 @@ function configureStore(): Command[] {
       return reply(1);
     }
 
-    if (name === "HGETALL") return reply(Object.fromEntries(hashes.get(key) ?? new Map<string, string>()));
+    if (name === "HGETALL") {
+      const hash = hashes.get(key) ?? new Map<string, string>();
+      // The REST API hands this back as RESP's flat [field, value, …] list.
+      return reply(hgetall === "flat" ? [...hash.entries()].flat() : Object.fromEntries(hash));
+    }
     if (name === "EXPIRE") return reply(1);
 
     return new Response(JSON.stringify({ error: "unexpected" }), {
@@ -114,6 +122,21 @@ describe("POST /api/share", () => {
     expect(response.status).toBe(403);
   });
 
+  it("accepts a write whose origin is the host Vercel forwards", async () => {
+    configureStore();
+
+    // Behind Vercel the function may see an internal host in `request.url`.
+    const response = await route(
+      new Request("http://10.0.0.7/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", origin: ORIGIN, "x-forwarded-host": "truthcap.app" },
+        body: JSON.stringify({ payload: VALID_PAYLOAD }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+  });
+
   it("answers 503 when the store is not configured, so the app can fall back", async () => {
     const response = await route(post({ payload: VALID_PAYLOAD }));
 
@@ -172,6 +195,15 @@ describe("the acknowledgment channel", () => {
     expect(await response.json()).toEqual({
       acks: [{ party: 0, when: WHEN }],
     });
+  });
+
+  it("reads acknowledgments from Upstash's flat RESP array as well", async () => {
+    configureStore("flat");
+
+    await route(post({ record: RECORD, party: 0, when: WHEN, code: "ABC123" }));
+    const response = await route(new Request(`${ORIGIN}/api/share?record=${RECORD}`));
+
+    expect(await response.json()).toEqual({ acks: [{ party: 0, when: WHEN }] });
   });
 
   it("reads an empty list for a record nobody has confirmed", async () => {

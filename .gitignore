@@ -4,6 +4,9 @@ docs/
 # Build output
 dist
 build
+.next
+out
+next-env.d.ts
 
 # Test results
 test-results

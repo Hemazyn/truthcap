@@ -1,7 +1,10 @@
+"use client";
+
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock, Copy, RefreshCw } from "lucide-react";
 import { formatDate } from "@/lib/validate";
-import { navigate, routes } from "@/lib/router";
+import { routes } from "@/lib/router";
 import { outstandingPartyLabels } from "@/lib/records";
 import { useShareUrl } from "@/lib/useShareUrl";
 import { useRecordAcks } from "@/lib/useRecordAcks";
@@ -19,6 +22,7 @@ interface TruthPendingCardProps {
 }
 
 export function TruthPendingCard({ capture, template, onBack }: TruthPendingCardProps) {
+  const router = useRouter();
   const discardDraft = useTruthStore((state) => state.discardDraft);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
@@ -58,7 +62,7 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
           <h3 className="text-xl font-semibold text-brand-800">Acknowledged by both</h3>
           <p className="text-sm text-brand-700">Both people have acknowledged this record. You can view, copy, or print your copy anytime.</p>
           <div className="mt-4">
-            <Button onClick={() => navigate(routes.record(capture.id))} size="lg">
+            <Button onClick={() => router.push(routes.record(capture.id))} size="lg">
               Open the record
             </Button>
           </div>
@@ -113,7 +117,7 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
             {/* The initiator confirms once; after that the record waits on the other party. */}
             {code && !initiatorAcknowledged && (
               <>
-                <Button onClick={() => navigate(routes.acknowledge(code))} className="w-full sm:w-auto">
+                <Button onClick={() => router.push(routes.acknowledge(code))} className="w-full sm:w-auto">
                   Acknowledge this record
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -137,7 +141,7 @@ export function TruthPendingCard({ capture, template, onBack }: TruthPendingCard
               variant="ghost"
               onClick={() => {
                 discardDraft();
-                navigate(routes.create());
+                router.push(routes.create());
               }}
             >
               <RefreshCw className="h-4 w-4" /> Start over

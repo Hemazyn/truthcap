@@ -3,12 +3,14 @@ import { getTemplate } from "@/data/templates";
 import type { RemoteAck } from "@/lib/acks";
 import { pushAck } from "@/lib/acks";
 import { mergeSharedCopy, withParties } from "@/lib/records";
-import { STORAGE_KEY, loadState, saveState } from "@/lib/storage";
+import { EMPTY_STATE, STORAGE_KEY, loadState, saveState } from "@/lib/storage";
 import type { TruthCapture, TruthTemplate } from "@/types/truth";
 
 type State = {
   records: TruthCapture[];
   activeId: string | null;
+  /** False until this device's localStorage has been read (see `hydrate`). */
+  hydrated: boolean;
 };
 
 /** Which side of the record is acknowledging it. */
@@ -84,7 +86,10 @@ function buildCapture(template: TruthTemplate): TruthCapture {
   };
 }
 
-const initial = loadState();
+// The first render has to match the HTML the server sent, and the server cannot
+// read localStorage — so the store starts empty and the shell hydrates it on
+// mount (`SiteShell` calls `hydrate`).
+const initial = EMPTY_STATE;
 
 export const useTruthStore = create<State & Actions>((set, get) => {
   const commit = (records: TruthCapture[], activeId: string | null) => {
@@ -110,10 +115,11 @@ export const useTruthStore = create<State & Actions>((set, get) => {
   return {
     records: initial.records,
     activeId: initial.activeId,
+    hydrated: false,
 
     hydrate: () => {
       const state = loadState();
-      set({ records: state.records, activeId: state.activeId });
+      set({ records: state.records, activeId: state.activeId, hydrated: true });
     },
 
     startCapture: (templateId) => {

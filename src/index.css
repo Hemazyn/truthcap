@@ -191,9 +191,9 @@ body {
   }
 
   /* Remove shadows */
-  .shadow-(--shadow-pop),
-  .shadow-(--shadow-card),
-  .shadow-(--shadow-cta) {
+  .shadow-\(--shadow-pop\),
+  .shadow-\(--shadow-card\),
+  .shadow-\(--shadow-cta\) {
     box-shadow: none !important;
   }
 

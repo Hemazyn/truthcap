@@ -1,19 +1,18 @@
+"use client";
+
 import { useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import type { ReactNode } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/useIsomorphicLayoutEffect";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, ShieldCheck } from "lucide-react";
+import { routes } from "@/lib/router";
+import { useStartRecord } from "@/lib/useStartRecord";
 import { useTruthStore } from "@/store/useTruthStore";
-import { navigate, routes, useRoute } from "@/lib/router";
-import { HomePage } from "@/components/HomePage";
-import { TruthCreateStep } from "@/components/TruthCreateStep";
-import { TruthAcknowledgePage } from "@/components/TruthAcknowledgePage";
-import { TruthRecordPage } from "@/components/TruthRecordPage";
-import { RecordsPage } from "@/components/RecordsPage";
-import { SharedRecordPage } from "@/components/SharedRecordPage";
-import { ShortRecordPage } from "@/components/ShortRecordPage";
 import { Button } from "@/components/ui/Button";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ScrollProgress } from "@/components/ScrollProgress";
-import { NotFoundPage } from "@/components/NotFoundPage";
 
 const FOOTER_TEMPLATES = [
   { id: "item-condition-agreement", label: "Item condition" },
@@ -34,28 +33,47 @@ function Logo() {
   );
 }
 
-export default function App() {
-  const route = useRoute();
-  const records = useTruthStore((state) => state.records);
-  const activeId = useTruthStore((state) => state.activeId);
-  const startCapture = useTruthStore((state) => state.startCapture);
-  const clearActive = useTruthStore((state) => state.clearActive);
+/**
+ * The header, footer and page transition around every route. Records live in
+ * localStorage, which the server cannot see, so the store is hydrated here
+ * rather than at import time — otherwise the first render would differ from the
+ * HTML the server sent.
+ */
+export function SiteShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const hydrate = useTruthStore((state) => state.hydrate);
+  const startRecord = useStartRecord();
+
+  useIsomorphicLayoutEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  // Old hash URLs (/#/create) still arrive from links people already have, and
+  // they can be reached with a hash change alone. This runs before the router is
+  // ready, so it upgrades the address directly.
+  useEffect(() => {
+    const upgrade = () => {
+      if (window.location.hash.startsWith("#/")) {
+        window.location.replace(window.location.hash.slice(1) || "/");
+      }
+    };
+
+    upgrade();
+    window.addEventListener("hashchange", upgrade);
+
+    return () => window.removeEventListener("hashchange", upgrade);
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [route]);
-
-  useEffect(() => {
-    const title = route.name === "create" ? "Create a record · TruthCap" : route.name === "records" ? "Your records · TruthCap" : route.name === "acknowledge" ? "Review and acknowledge · TruthCap" : route.name === "shared" || route.name === "short" ? "Shared record · TruthCap" : route.name === "record" ? `${records.find((record) => record.id === route.id)?.title ?? "Record"} · TruthCap` : route.name === "not-found" ? "Page not found · TruthCap" : "TruthCap — What you agreed, written down. Both keep a copy.";
-
-    document.title = title;
-  }, [route, records]);
+  }, [pathname]);
 
   const jumpTo = (id: string) => {
     const scroll = () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    if (route.name !== "home") {
-      navigate(routes.home());
+    if (pathname !== "/") {
+      router.push(routes.home());
       window.setTimeout(scroll, 120);
       return;
     }
@@ -63,20 +81,7 @@ export default function App() {
     scroll();
   };
 
-  const startRecord = (templateId?: string) => {
-    if (templateId) {
-      startCapture(templateId);
-      navigate(routes.create());
-      return;
-    }
-
-    const active = records.find((record) => record.id === activeId);
-    if (active?.status === "acknowledged") clearActive();
-    navigate(routes.create());
-  };
-
-  const onHome = route.name === "home";
-  const routeKey = route.name === "acknowledge" ? `${route.name}-${route.code}` : route.name === "record" ? `${route.name}-${route.id}` : route.name === "shared" ? `${route.name}-${route.data.length}` : route.name === "short" ? `${route.name}-${route.id}` : route.name;
+  const onHome = pathname === "/";
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
@@ -84,17 +89,9 @@ export default function App() {
 
       <motion.header className="sticky top-0 z-40 border-b border-line/80 bg-canvas/85 backdrop-blur print:hidden" initial={{ y: -18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
-          <a
-            href="/"
-            onClick={(event) => {
-              event.preventDefault();
-              navigate(routes.home());
-            }}
-            className="rounded-xl transition hover:opacity-80"
-            aria-label="TruthCap home"
-          >
+          <Link href={routes.home()} className="rounded-xl transition hover:opacity-80" aria-label="TruthCap home">
             <Logo />
-          </a>
+          </Link>
 
           <div className="flex items-center gap-2">
             <nav className="mr-1 flex items-center gap-5 text-sm font-medium text-ink-2">
@@ -108,7 +105,7 @@ export default function App() {
                   </button>
                 </>
               )}
-              <button type="button" onClick={() => navigate(routes.records())} aria-current={route.name === "records" ? "page" : undefined} className={route.name === "records" ? "text-ink" : "hover:text-ink"}>
+              <button type="button" onClick={() => router.push(routes.records())} aria-current={pathname === routes.records() ? "page" : undefined} className={pathname === routes.records() ? "text-ink" : "hover:text-ink"}>
                 Records
               </button>
             </nav>
@@ -119,7 +116,7 @@ export default function App() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             ) : (
-              <Button size="sm" variant="ghost" onClick={() => navigate(routes.home())}>
+              <Button size="sm" variant="ghost" onClick={() => router.push(routes.home())}>
                 <ArrowLeft className="h-4 w-4" />
                 <span className="hidden sm:inline">Back home</span>
               </Button>
@@ -128,29 +125,9 @@ export default function App() {
         </div>
       </motion.header>
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.main key={routeKey} className="flex-1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
-          {route.name === "home" && <HomePage onStart={startRecord} />}
-
-          {route.name === "create" && (
-            <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-12">
-              <TruthCreateStep />
-            </div>
-          )}
-
-          {route.name === "acknowledge" && <TruthAcknowledgePage code={route.code} />}
-
-          {route.name === "record" && <TruthRecordPage id={route.id} />}
-
-          {route.name === "records" && <RecordsPage />}
-
-          {route.name === "shared" && <SharedRecordPage data={route.data} />}
-
-          {route.name === "short" && <ShortRecordPage id={route.id} />}
-
-          {route.name === "not-found" && <NotFoundPage />}
-        </motion.main>
-      </AnimatePresence>
+      <motion.main key={pathname} className="flex-1" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+        {children}
+      </motion.main>
 
       <motion.footer className="border-t border-line bg-surface print:hidden" initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.08 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
         <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
@@ -188,7 +165,7 @@ export default function App() {
                   </button>
                 </li>
                 <li>
-                  <button type="button" onClick={() => navigate(routes.records())} className="hover:text-brand-700">
+                  <button type="button" onClick={() => router.push(routes.records())} className="hover:text-brand-700">
                     Your records
                   </button>
                 </li>
@@ -211,7 +188,12 @@ export default function App() {
           </div>
 
           <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-line pt-6 sm:flex-row sm:items-center">
-            <p className="text-xs text-ink-3">Developed by <a href="https://iamtofunmi.vercel.app/" target="_blank" rel="noopener" className="underline underline-offset-2 text-brand-600">devEmma</a></p>
+            <p className="text-xs text-ink-3">
+              Developed by{" "}
+              <a href="https://iamtofunmi.vercel.app/" target="_blank" rel="noopener" className="text-brand-600 underline underline-offset-2">
+                devEmma
+              </a>
+            </p>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
               <p className="text-xs text-ink-3">Every record is timestamped and held by both people.</p>
               <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-brand-700">

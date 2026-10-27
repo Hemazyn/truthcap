@@ -17,9 +17,84 @@ const MAX_WHEN_LENGTH = 40;
 type RedisReply = { result?: unknown } | null;
 type Body = Record<string, unknown>;
 
-// ── Next.js edge runtime
-// Runs at the Edge so crypto.getRandomValues and fetch are native.
-export const runtime = "edge";
+// ── in-memory store (development only)
+/**
+ * `next dev` starts without Upstash credentials, and short links are the default
+ * way to share, so the handler answers from memory while NODE_ENV is
+ * development and no Redis is configured. It is the same handler, the same
+ * validation and the same ack logic in dev and production — only the storage
+ * differs, and a production deployment without credentials still answers 503
+ * instead of pretending everything works.
+ */
+const memoryValues = new Map<string, { value: string; expiresAt: number }>();
+const memoryHashes = new Map<string, { values: Map<string, string>; expiresAt: number }>();
+
+function liveValue(key: string): { value: string; expiresAt: number } | undefined {
+  const entry = memoryValues.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt < Date.now()) {
+    memoryValues.delete(key);
+    return undefined;
+  }
+  return entry;
+}
+
+function liveHash(key: string): { values: Map<string, string>; expiresAt: number } | undefined {
+  const entry = memoryHashes.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt < Date.now()) {
+    memoryHashes.delete(key);
+    return undefined;
+  }
+  return entry;
+}
+
+/** Answers the handful of commands this endpoint uses, in Upstash's JSON shape. */
+function memoryCommand(command: (string | number)[]): RedisReply {
+  const [name, ...args] = command;
+  const key = String(args[0]);
+
+  if (name === "SET") {
+    const [value, ...options] = args.slice(1) as string[];
+
+    if (options.includes("NX") && liveValue(key)) return { result: null };
+
+    const ex = options.indexOf("EX");
+    const seconds = ex === -1 ? Number.NaN : Number(options[ex + 1]);
+    memoryValues.set(key, { value, expiresAt: Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Number.POSITIVE_INFINITY });
+    return { result: "OK" };
+  }
+
+  if (name === "GET") return { result: liveValue(key)?.value ?? null };
+
+  if (name === "HSET") {
+    const [, field, value] = args as [string, string, string];
+    const hash = liveHash(key) ?? { values: new Map<string, string>(), expiresAt: Number.POSITIVE_INFINITY };
+    hash.values.set(field, value);
+    memoryHashes.set(key, hash);
+    return { result: 1 };
+  }
+
+  // Real Redis answers HGETALL with a flat [field, value, …] list.
+  if (name === "HGETALL") return { result: liveHash(key) ? [...(liveHash(key)?.values ?? new Map()).entries()].flat() : [] };
+
+  if (name === "EXPIRE") {
+    const expiresAt = Date.now() + Number(args[1]) * 1000;
+    const hash = liveHash(key);
+    if (hash) {
+      hash.expiresAt = expiresAt;
+      return { result: 1 };
+    }
+    const value = liveValue(key);
+    if (value) {
+      value.expiresAt = expiresAt;
+      return { result: 1 };
+    }
+    return { result: 0 };
+  }
+
+  return { result: null };
+}
 
 // ── helpers
 function ackKey(record: string): string {
@@ -40,7 +115,7 @@ async function redisCommand(command: (string | number)[]): Promise<RedisReply> {
   const url = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/+$/, "");
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token) return null;
+  if (!url || !token) return process.env.NODE_ENV === "development" ? memoryCommand(command) : null;
 
   try {
     const response = await fetch(url, {
@@ -66,23 +141,45 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
   });
 }
 
-/** Browsers always send Origin; without it (curl, tests) the call is allowed. */
+/**
+ * Browsers always send Origin; without it (curl, tests) the call is allowed.
+ * Vercel may hand the function an internal host in `request.url`, so the public
+ * host it records in `x-forwarded-host` counts as the same origin too.
+ */
 function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return true;
 
   try {
-    return new URL(origin).host === new URL(request.url).host;
+    const host = new URL(origin).host;
+    if (host === new URL(request.url).host) return true;
+
+    const forwarded = request.headers.get("x-forwarded-host");
+    return forwarded ? forwarded.split(",").some((value) => value.trim() === host) : false;
   } catch {
     return false;
   }
 }
 
-/** `HGETALL` answers with a field → value map; anything else reads as empty. */
-function readAcks(reply: RedisReply): { party: number; when: string }[] {
-  const entries = reply?.result && typeof reply.result === "object" && !Array.isArray(reply.result) ? (reply.result as Record<string, unknown>) : {};
+/**
+ * `HGETALL` comes back as RESP's flat `[field, value, …]` list over the REST API,
+ * though it is documented elsewhere as a field → value map. Both shapes are read
+ * here, because an array parsed as a map silently looks like "nobody acknowledged".
+ */
+function ackEntries(reply: RedisReply): [string, unknown][] {
+  const result = reply?.result;
 
-  return Object.entries(entries)
+  if (Array.isArray(result)) {
+    const pairs: [string, unknown][] = [];
+    for (let index = 0; index + 1 < result.length; index += 2) pairs.push([String(result[index]), result[index + 1]]);
+    return pairs;
+  }
+
+  return result && typeof result === "object" ? Object.entries(result as Record<string, unknown>) : [];
+}
+
+function readAcks(reply: RedisReply): { party: number; when: string }[] {
+  return ackEntries(reply)
     .map(([party, when]) => ({
       party: Number(party),
       when: typeof when === "string" ? when : "",
@@ -193,8 +290,11 @@ async function route(request: Request): Promise<Response> {
   return json(405, { error: "method not allowed" }, { Allow: "GET, POST" });
 }
 
-// ── Next.js App Router exports
-// These replace the old Cloudflare Workers `export default { fetch }`.
+// ── Next.js route handler exports
+// Next serves this file as `/api/share` in development and in production, so
+// there is no second implementation of the endpoint to fall out of step. The
+// named method exports are the App Router contract (`GET`/`POST` take a
+// standard Request and return a Response).
 export async function GET(request: Request): Promise<Response> {
   return route(request);
 }
@@ -202,5 +302,3 @@ export async function GET(request: Request): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   return route(request);
 }
-
-export { route };

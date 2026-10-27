@@ -1,3 +1,5 @@
+"use client";
+
 import { findRecord, templateFor } from "@/lib/records";
 import { useTruthStore } from "@/store/useTruthStore";
 import { RecordNotFound } from "@/components/RecordNotFound";

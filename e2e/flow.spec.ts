@@ -286,6 +286,7 @@ test("an acknowledgment the initiator made travels in the link they send", async
 
   // The initiator confirms first, so the link they send carries their side.
   await page.getByRole("button", { name: "Acknowledge this record" }).click();
+  await expect(page.getByRole("heading", { name: "Review before you acknowledge" })).toBeVisible();
   await page.getByRole("button", { name: "Acknowledge this record" }).click();
   await expect(page.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
 
@@ -320,6 +321,7 @@ test("one device's acknowledgment reaches the other device without a refresh", a
 
   // The initiator confirms first, so their copy waits for Bola.
   await first.getByRole("button", { name: "Acknowledge this record" }).click();
+  await expect(first.getByRole("heading", { name: "Review before you acknowledge" })).toBeVisible();
   await first.getByRole("button", { name: "Acknowledge this record" }).click();
   await expect(first.getByRole("heading", { name: "Waiting for Bola to acknowledge" })).toBeVisible();
 

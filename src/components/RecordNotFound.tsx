@@ -1,5 +1,6 @@
 import { FileQuestion } from "lucide-react";
-import { navigate, routes } from "@/lib/router";
+import { useRouter } from "next/navigation";
+import { routes } from "@/lib/router";
 import { Button } from "@/components/ui/Button";
 
 interface RecordNotFoundProps {
@@ -9,6 +10,8 @@ interface RecordNotFoundProps {
 }
 
 export function RecordNotFound({ title, description, detail }: RecordNotFoundProps) {
+  const router = useRouter();
+
   return (
     <div className="mx-auto max-w-xl">
       <div className="rounded-3xl border border-line bg-surface p-7 text-center shadow-(--shadow-card) sm:p-10">
@@ -19,8 +22,8 @@ export function RecordNotFound({ title, description, detail }: RecordNotFoundPro
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-2">{description}</p>
         {detail && <p className="mt-4 rounded-xl bg-surface-2 px-4 py-3 font-mono text-sm tracking-[0.16em] text-ink-2">{detail}</p>}
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button onClick={() => navigate(routes.home())}>Back home</Button>
-          <Button variant="secondary" onClick={() => navigate(routes.create())}>
+          <Button onClick={() => router.push(routes.home())}>Back home</Button>
+          <Button variant="secondary" onClick={() => router.push(routes.create())}>
             Create a record
           </Button>
         </div>
