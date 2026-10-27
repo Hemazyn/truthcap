@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { fetchSharedPayload } from "@/lib/shortlink";
 import { RecordNotFound } from "@/components/RecordNotFound";

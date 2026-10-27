@@ -6,7 +6,7 @@ TruthCap turns everyday agreements — a used item's condition, a repair quote, 
 
 [![Built with React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 
 ## ✨ Features
@@ -41,15 +41,15 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 ## 🛠️ Tech Stack
 
 | Layer                | Technology                                                            | Purpose                                             |
 | -------------------- | --------------------------------------------------------------------- | --------------------------------------------------- |
-| **Framework**        | [React 19](https://react.dev/)                                        | UI library with latest features                     |
+| **Framework**        | [Next.js 16](https://nextjs.org/)                                     | App Router: file routes, metadata and `/api/share`  |
+| **UI**               | [React 19](https://react.dev/)                                        | UI library with latest features                     |
 | **Language**         | [TypeScript 5](https://www.typescriptlang.org/)                       | Type-safe development                               |
-| **Build Tool**       | [Vite 8](https://vitejs.dev/)                                         | Fast dev server and optimized builds                |
 | **Styling**          | [Tailwind CSS 4](https://tailwindcss.com/)                            | Utility-first CSS with design tokens                |
 | **State Management** | [Zustand 5](https://zustand-demo.pmnd.rs/)                            | Lightweight state with localStorage persistence     |
 | **Animations**       | [Framer Motion](https://www.framer.com/motion/)                       | Smooth, accessible animations                       |
@@ -61,22 +61,22 @@ Open [http://localhost:5173](http://localhost:5173) to view it in your browser.
 
 ```
 truthcap/
-├── api/                 # Serverless functions (short share links)
 ├── public/              # Static assets (favicon, icons)
 ├── src/
-│   ├── components/      # React components
+│   ├── app/             # App Router: layout, one folder per route, /api/share
+│   │   └── api/share/   # Short links and the acknowledgment channel
+│   ├── components/      # React components (SiteShell carries the app chrome)
 │   │   ├── ui/         # Reusable UI primitives
 │   │   └── ...         # Feature components
 │   ├── data/           # Template definitions
-│   ├── lib/            # Utilities (router, storage, validation, share payload)
+│   ├── lib/            # Utilities (routes, storage, validation, share payload)
 │   ├── store/          # Zustand store
 │   ├── types/          # TypeScript type definitions
-│   ├── App.tsx         # App shell and routing
-│   ├── index.css       # Global styles and design tokens
-│   └── main.tsx        # Entry point
+│   └── index.css       # Global styles and design tokens
 ├── e2e/                # End-to-end tests
 ├── scripts/            # Repo tooling (brand image generation)
-└── index.html          # HTML template
+├── next.config.ts      # Next configuration
+└── postcss.config.mjs  # Tailwind CSS 4
 ```
 
 ## 🗺️ Routes
@@ -90,6 +90,7 @@ truthcap/
 | `/record/:id`        | View pending or completed record                                  |
 | `/s/:id`             | Short link: fetches the stored record, then shows the shared copy |
 | `/shared#<payload>`  | Read-only copy decoded from the link itself (offline fallback)    |
+| `/api/share`         | `POST` stores a link or an acknowledgment; `GET` reads either     |
 
 ## 🔄 How It Works
 
@@ -105,7 +106,7 @@ truthcap/
 | ---------------------- | ---------------------------------------------------- |
 | `npm run dev`          | Start development server with hot reload             |
 | `npm run build`        | Type-check and build for production                  |
-| `npm run preview`      | Preview production build locally                     |
+| `npm run start`        | Serve the production build locally                   |
 | `npm run lint`         | Run ESLint                                           |
 | `npm run typecheck`    | Run TypeScript type checking                         |
 | `npm run test`         | Run unit tests with Vitest                           |
@@ -121,15 +122,15 @@ Records live in your browser under `localStorage` key `truthcap.records.v1`.
 
 **Short links.** When you share, the encoded record is sent to `POST /api/share`, stored under an 8-character id and returned as `/s/ab23cd45`. The record is kept there for **90 days** (`EX 7776000`), after which the link shows "We can't find that record". Anyone holding the link can read the record, exactly like a forwarded PDF — treat the link as the record itself.
 
-**Offline fallback.** If the API is unreachable (no connection, or a deploy without the store configured), sharing falls back to the record travelling inside the URL fragment (`/shared#…`): nothing is stored on a server, the link is longer, and the app says so in the UI. Local development gets a working API from the dev server, so you only see the fallback when you are actually offline.
+**Offline fallback.** If the API is unreachable (no connection, or a deploy without the store configured), sharing falls back to the record travelling inside the URL fragment (`/shared#…`): nothing is stored on a server, the link is longer, and the app says so in the UI. Local development runs the same endpoint, so you only see the fallback when you are actually offline.
 
 The payload itself (`src/lib/payload.ts`) is binary — template and choices as indexes, timestamps as varints, dates as three bytes, party roles left out because the template already has them — deflated and base64url-encoded. A typical record is ~220 characters before it is stored behind a short id.
 
-Acknowledging a shared copy timestamps that copy on the receiving device; syncing both copies requires the upcoming Phase 3 backend.
+**Acknowledgment channel.** The same endpoint carries acknowledgments: `POST /api/share` records one party's timestamp against the record id (guarded by the 6-character code) and `GET /api/share?record=…` reads them back, so each side sees the other's confirmation without sending a fresh link. The screens poll that channel while they are open, and the first code written for a record is pinned so a second code cannot take it over.
 
 ### Enabling short links
 
-Local development needs nothing: `npm run dev` serves `/api/share` from memory (cleared when the server restarts).
+Local development needs nothing: `npm run dev` runs the real handler in `src/app/api/share/route.ts`, which keeps records in memory while `NODE_ENV` is development and no Redis is configured (the memory is cleared when the server restarts). Development and production therefore run the same validation, routing and acknowledgment code — only the storage differs.
 
 For a deployment, create a Redis database on [Upstash](https://console.upstash.com) and set two environment variables in Vercel (and in `.env.local` if you want `vercel dev` to use them):
 
@@ -138,7 +139,7 @@ UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
 ```
 
-`api/share.ts` talks to Upstash over its HTTP REST API, so there is no client library or connection pool. Without these variables the endpoint answers `503` and sharing falls back to the long self-contained links.
+`src/app/api/share/route.ts` talks to Upstash over its HTTP REST API, so there is no client library or connection pool. A production deployment without these variables answers `503` (visible, rather than quietly pretending to work) and sharing falls back to the long self-contained links.
 
 Known gap: `POST /api/share` validates size and rejects cross-origin writes, but is not rate limited. Anyone can create links until the Redis quota runs out; add Upstash's rate limiter before opening it to the public.
 

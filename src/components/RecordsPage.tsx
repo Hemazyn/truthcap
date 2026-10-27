@@ -1,9 +1,12 @@
+"use client";
+
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ClipboardList, FileText, Plus, Search } from "lucide-react";
 import { formatDate } from "@/lib/validate";
 import { fetchAcks } from "@/lib/acks";
 import { acknowledgedPartyCount, outstandingPartyLabels, partyLabel } from "@/lib/records";
-import { navigate, routes } from "@/lib/router";
+import { routes } from "@/lib/router";
 import { useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -36,6 +39,7 @@ function matchesQuery(capture: TruthCapture, query: string): boolean {
 }
 
 export function RecordsPage() {
+  const router = useRouter();
   const records = useTruthStore((state) => state.records);
   const openRecord = useTruthStore((state) => state.openRecord);
   const applyAcks = useTruthStore((state) => state.applyAcks);
@@ -67,7 +71,7 @@ export function RecordsPage() {
 
   const open = (capture: TruthCapture) => {
     openRecord(capture.id);
-    navigate(capture.status === "draft" ? routes.create() : routes.record(capture.id));
+    router.push(capture.status === "draft" ? routes.create() : routes.record(capture.id));
   };
 
   return (
@@ -79,7 +83,7 @@ export function RecordsPage() {
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">{records.length === 0 ? "Records you write or open from a share link are kept in this browser." : `${records.length} record${records.length === 1 ? "" : "s"} saved here, ${acknowledgedCount} acknowledged by both people.`}</p>
         </div>
 
-        <Button onClick={() => navigate(routes.create())}>
+        <Button onClick={() => router.push(routes.create())}>
           <Plus className="h-4 w-4" />
           New record
         </Button>
@@ -107,7 +111,7 @@ export function RecordsPage() {
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">{records.length === 0 ? <ClipboardList className="h-5 w-5" /> : <Search className="h-5 w-5" />}</span>
           <h2 className="mt-4 text-base font-semibold text-ink">{records.length === 0 ? "No records yet" : "Nothing matches that"}</h2>
           <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-ink-2">{records.length === 0 ? "Start with a template, write the details plainly, and share the link with the other person." : "Try a different word, or clear the filter to see everything saved here."}</p>
-          <Button className="mt-5" onClick={() => (records.length === 0 ? navigate(routes.create()) : (setQuery(""), setFilter("all")))}>
+          <Button className="mt-5" onClick={() => (records.length === 0 ? router.push(routes.create()) : (setQuery(""), setFilter("all")))}>
             {records.length === 0 ? (
               <>
                 <Plus className="h-4 w-4" />

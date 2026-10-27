@@ -1,11 +1,16 @@
+"use client";
+
 import { ArrowRight, Home } from "lucide-react";
 import { motion } from "framer-motion";
-import { navigate, routes } from "@/lib/router";
+import { useRouter } from "next/navigation";
+import { routes } from "@/lib/router";
 import { Button } from "@/components/ui/Button";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export function NotFoundPage() {
+  const router = useRouter();
+
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-3xl flex-col items-center justify-center px-5 py-16 text-center sm:px-8">
       <motion.div className="relative" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
@@ -25,11 +30,11 @@ export function NotFoundPage() {
         </motion.div>
 
         <motion.div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5, ease: EASE }}>
-          <Button onClick={() => navigate(routes.home())}>
+          <Button onClick={() => router.push(routes.home())}>
             <Home className="h-4 w-4" />
             Back home
           </Button>
-          <Button variant="secondary" onClick={() => navigate(routes.create())}>
+          <Button variant="secondary" onClick={() => router.push(routes.create())}>
             Create a record
             <ArrowRight className="h-4 w-4" />
           </Button>

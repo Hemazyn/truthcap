@@ -1,11 +1,14 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Clock, Link2, Lock, Printer, ShieldCheck } from "lucide-react";
 import { formatDate } from "@/lib/validate";
 import { canDecodeCompressedLinks, decodeRecord } from "@/lib/share";
 import { acknowledgedPartyCount, mergeSharedCopy, outstandingPartyLabels, templateFor } from "@/lib/records";
 import { printRecord } from "@/lib/print";
-import { navigate, routes } from "@/lib/router";
+import { routes } from "@/lib/router";
 import { useRecordAcks } from "@/lib/useRecordAcks";
 import { COUNTERPARTY_PARTY, INITIATOR_PARTY, useTruthStore } from "@/store/useTruthStore";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +26,7 @@ interface SharedRecordPageProps {
 const WRONG_CODE = "That code does not match this record. Check it and try again.";
 
 export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProps) {
+  const router = useRouter();
   const records = useTruthStore((state) => state.records);
   const importRecord = useTruthStore((state) => state.importRecord);
   const acknowledge = useTruthStore((state) => state.acknowledge);
@@ -259,7 +263,7 @@ export function SharedRecordPage({ data, source = "link" }: SharedRecordPageProp
               Acknowledge this copy
             </Button>
           ) : (
-            <Button onClick={() => navigate(routes.records())} variant="secondary">
+            <Button onClick={() => router.push(routes.records())} variant="secondary">
               All your records
             </Button>
           )}

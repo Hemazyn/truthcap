@@ -1,8 +1,11 @@
+"use client";
+
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { useTruthStore } from "@/store/useTruthStore";
 import { findActiveRecord, templateFor } from "@/lib/records";
-import { navigate, routes } from "@/lib/router";
+import { routes } from "@/lib/router";
 import { cn } from "@/lib/utils";
 import { TruthTemplatePicker } from "@/components/TruthTemplatePicker";
 import { TruthInstructions } from "@/components/TruthInstructions";
@@ -18,6 +21,7 @@ const STEP_LABELS: { id: Step; label: string }[] = [
 ];
 
 export function TruthCreateStep() {
+  const router = useRouter();
   const records = useTruthStore((state) => state.records);
   const activeId = useTruthStore((state) => state.activeId);
   const startCapture = useTruthStore((state) => state.startCapture);
@@ -44,7 +48,7 @@ export function TruthCreateStep() {
 
   const goBack = () => {
     if (step === "pick") {
-      navigate(routes.home());
+      router.push(routes.home());
       return;
     }
     if (step === "fill") {
@@ -56,9 +60,9 @@ export function TruthCreateStep() {
 
   useEffect(() => {
     if (capture?.status === "acknowledged") {
-      navigate(routes.record(capture.id));
+      router.push(routes.record(capture.id));
     }
-  }, [capture?.status, capture?.id]);
+  }, [capture?.status, capture?.id, router]);
 
   if (capture?.status === "acknowledged") {
     return <p className="py-8 text-sm text-ink-2">Opening your record…</p>;
